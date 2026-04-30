@@ -1,0 +1,40 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnlilFinancialPlanning.Api", "EnlilFinancialPlanning.Api\EnlilFinancialPlanning.Api.csproj", "{8B7CFD42-3A91-4E2F-9D5C-7E8F1A2B3C4D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "client", "client", "{F2A1D5E6-9C8B-4D3E-A1F2-B3C4D5E6F7A8}"
+	ProjectSection(SolutionItems) = preProject
+		client\package.json = client\package.json
+		client\vite.config.ts = client\vite.config.ts
+		client\tsconfig.json = client\tsconfig.json
+		client\tsconfig.app.json = client\tsconfig.app.json
+		client\tsconfig.node.json = client\tsconfig.node.json
+		client\index.html = client\index.html
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{D3E4F5A6-B7C8-4D9E-A0B1-C2D3E4F5A6B7}"
+	ProjectSection(SolutionItems) = preProject
+		docs\solution-scaffold.md = docs\solution-scaffold.md
+		CLAUDE.md = CLAUDE.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8B7CFD42-3A91-4E2F-9D5C-7E8F1A2B3C4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B7CFD42-3A91-4E2F-9D5C-7E8F1A2B3C4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B7CFD42-3A91-4E2F-9D5C-7E8F1A2B3C4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B7CFD42-3A91-4E2F-9D5C-7E8F1A2B3C4D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4C5D6E7F-8A9B-4C0D-BE2F-3A4B5C6D7E8F}
+	EndGlobalSection
+EndGlobal

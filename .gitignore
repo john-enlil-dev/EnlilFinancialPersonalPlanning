@@ -1,0 +1,26 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.vs/
+*.db
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# User-uploaded recipe/meal images
+Api/Uploads/
+
+# Built React client (populated at deploy time by the GitHub Action)
+Api/wwwroot/
