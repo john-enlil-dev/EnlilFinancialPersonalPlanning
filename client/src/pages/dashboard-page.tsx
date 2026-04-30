@@ -4,11 +4,11 @@ import { Card, CardBody, CardText, CardTitle, Col, Container, Row } from 'reacts
 export default function DashboardPage() {
   const renderPlaceholderCard = (title: string, body: string, linkTo: string, linkLabel: string) => (
     <Col md="6" lg="4" className="mb-3">
-      <Card className="h-100">
+      <Card className="h-100 dashboard-card">
         <CardBody>
           <CardTitle tag="h5">{title}</CardTitle>
           <CardText>{body}</CardText>
-          <Link to={linkTo} className="btn btn-outline-secondary">
+          <Link to={linkTo} className="btn btn-outline-light">
             {linkLabel}
           </Link>
         </CardBody>

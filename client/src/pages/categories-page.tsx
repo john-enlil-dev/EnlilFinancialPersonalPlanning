@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Badge,
   Container,
   Form,
   FormGroup,
@@ -204,17 +205,39 @@ export default function CategoriesPage() {
           </tr>
         </thead>
         <tbody>
-          {categories.map((c) => (
-            <tr key={c.uid}>
-              <td>{c.name}</td>
-              <td>{CATEGORY_DIRECTION_LABELS[c.direction]}</td>
-              <td>{c.description ?? '—'}</td>
-              <td>{c.isArchived ? <span className="text-muted">Archived</span> : 'Active'}</td>
-              <td>
-                <RenderDefaultButton label="Edit" onClick={() => startEdit(c)} />
-              </td>
-            </tr>
-          ))}
+          {categories.map((c) => {
+            const directionColor =
+              c.direction === CategoryDirection.Income
+                ? 'success'
+                : c.direction === CategoryDirection.Expense
+                  ? 'danger'
+                  : 'info';
+            return (
+              <tr key={c.uid}>
+                <td className="fw-semibold">{c.name}</td>
+                <td>
+                  <Badge color={directionColor} pill>
+                    {CATEGORY_DIRECTION_LABELS[c.direction]}
+                  </Badge>
+                </td>
+                <td>{c.description ?? '—'}</td>
+                <td>
+                  {c.isArchived ? (
+                    <Badge color="secondary" pill>
+                      Archived
+                    </Badge>
+                  ) : (
+                    <Badge color="success" pill>
+                      Active
+                    </Badge>
+                  )}
+                </td>
+                <td>
+                  <RenderDefaultButton label="Edit" onClick={() => startEdit(c)} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </Table>
     );

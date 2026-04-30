@@ -50,9 +50,24 @@ First domain primitive of the financial planning app: a record of money flowing 
   - **Validation: FluentValidation.** A validator per request DTO. Cross-field rules (per-cadence XOR constraints on `RecurringTemplate`) live there.
   - **Background jobs: Hangfire** (`Hangfire.AspNetCore` + `Hangfire.SqlServer`) on the same SQL Server as the app. Used for the eager horizon-extension job that re-runs daily to seed any newly-in-window occurrences. Re-seed-on-template-edit stays synchronous on the save call (fast, deterministic, predictable to the user).
 
-## Open questions
-- File structure for the React side.
-- DTO shape per entity (Create/Update/Response separation).
+- **All 5 slices implemented 2026-04-30.**
+  - Slice 1 — `Data/Entities/{LineItem, Category, RecurringTemplate, Enums/...}` + `Data/Configurations/*` + `AppDbContext` updated. **User must run `Add-Migration LineItemsInitial` then `Update-Database` in PMC.**
+  - Slice 2 — `Dtos/*` (Create/Update/Response per entity), `Validation/*` (FluentValidation per Create/Update DTO including per-cadence XOR rules), `Managers/*`, `Controllers/*`. SharpGrip auto-validation wired in.
+  - Slice 3 — `Services/{ITemplateSeederService, TemplateSeederService}` with full per-cadence schedule logic (`AlignForwardToDayOfWeek`, `ResolveDay`, etc.). Hangfire SQL-server-backed; `extend-template-horizon` recurring job runs daily. Re-seed-on-edit calls `ReseedHorizonAsync` synchronously.
+  - Slice 4 — frontend types + enum tables + `axios` API client + `react-router-dom` routing + `NavBar` + dashboard placeholder.
+  - Slice 5 — `categories-page`, `ledger-page`, `templates-page`. Templates page renders per-cadence form fields dynamically (Monthly = day-of-month + last-day toggle; Weekly/BiWeekly = day-of-week; Quarterly = month-of-quarter + day; Annually = month + day; CustomDays = interval).
+
+## Theme baseline (2026-04-30)
+- **Dark mode default via Bootstrap 5.3's `data-bs-theme="dark"`** on `<html>` in `index.html`. Reactstrap components inherit it; navbar / cards / tables / inputs / modals all render in dark variants automatically.
+- **Semantic color tokens in `client/src/theme/theme.css`** as CSS variables (`--enlil-income` green, `--enlil-expense` red, `--enlil-accent` indigo) with helper classes (`text-income`, `text-expense`, `bg-income-soft`, `bg-expense-soft`). To shift the palette later, edit the variables in one place.
+- **Direction is color-coded** across ledger / templates / categories: green pill for income, red pill for expense (info pill for `Both` on categories). Amount columns use `+`/`−` prefixes plus the income/expense text colors.
+- **`dashboard-card` utility class** adds an accent left-border + lift-on-hover for the dashboard placeholder cards. Gives the dashboard a visual identity without committing to a specific layout.
+- **Ledger explicit client-side date sort** (descending) on top of the backend sort. Header column shows `Date ↓` so the sort direction is visible. Real sortable headers are a future iteration.
+
+## Deferred / not implemented
+- **No `DELETE` endpoints on any controller.** Per global "Never Delete Data From Databases" rule, deletion needs explicit user authorization. The seeder *does* delete unmodified future seeded rows on re-seed (authorized by the design — "wipe and re-seed unmodified future rows"). User-facing delete (a "remove this line item" button, "remove this template" button) is intentionally absent until authorized.
+- **No frontend forms-validation library.** Server-side FluentValidation is the source of truth; the UI shows the server's error message on save failure but doesn't pre-validate per-cadence rules client-side. Adding `react-hook-form` + zod (or similar) is a future iteration.
+- **Dashboard panels deferred.** Placeholder only — graphs/widgets/drill-downs to be designed later.
 - Field shape on each entity (Amount precision, Date type, etc.).
 - Materialization timing — on-demand at query time, on a background pass, or eagerly N months ahead?
 - UI shape (one ledger view? separate income/expense tabs? per-category breakdown?).

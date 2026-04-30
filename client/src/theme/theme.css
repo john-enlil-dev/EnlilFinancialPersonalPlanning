@@ -1,0 +1,69 @@
+/* App-level design tokens. Layered on top of Bootstrap 5.3's dark theme.
+   Adjust these to evolve the look without touching component CSS. */
+
+:root[data-bs-theme='dark'] {
+  --enlil-income: #22c55e;
+  --enlil-income-soft: rgba(34, 197, 94, 0.12);
+
+  --enlil-expense: #ef4444;
+  --enlil-expense-soft: rgba(239, 68, 68, 0.12);
+
+  --enlil-accent: #6366f1;
+  --enlil-accent-soft: rgba(99, 102, 241, 0.18);
+
+  --enlil-card-border: rgba(255, 255, 255, 0.08);
+  --enlil-surface: #1a1d23;
+  --enlil-surface-elevated: #20242c;
+}
+
+body {
+  background-color: var(--enlil-surface);
+}
+
+/* Income / expense semantic helpers — used in tables, badges, totals. */
+.text-income {
+  color: var(--enlil-income) !important;
+}
+.text-expense {
+  color: var(--enlil-expense) !important;
+}
+.bg-income-soft {
+  background-color: var(--enlil-income-soft);
+}
+.bg-expense-soft {
+  background-color: var(--enlil-expense-soft);
+}
+
+/* Cards get a subtle border + accent on hover. */
+.card {
+  background-color: var(--enlil-surface-elevated);
+  border-color: var(--enlil-card-border);
+}
+
+.dashboard-card {
+  border-left: 3px solid var(--enlil-accent);
+  transition: transform 0.15s ease, border-left-color 0.15s ease;
+}
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  border-left-color: #818cf8;
+}
+
+/* Tables — give the header row a touch of accent and tighten spacing. */
+.table {
+  --bs-table-bg: transparent;
+}
+.table thead th {
+  border-bottom: 1px solid var(--enlil-card-border);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* Page header h1 — slightly tighter, more deliberate. */
+h1 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
