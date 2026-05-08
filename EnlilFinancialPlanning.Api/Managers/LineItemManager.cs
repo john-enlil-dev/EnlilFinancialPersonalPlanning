@@ -24,8 +24,8 @@ public sealed class LineItemManager(AppDbContext db)
         if (query.Direction.HasValue)
             q = q.Where(li => li.Direction == query.Direction.Value);
 
-        if (query.CategoryUID.HasValue)
-            q = q.Where(li => li.CategoryUID == query.CategoryUID.Value);
+        if (query.CategoryUIDs.Count > 0)
+            q = q.Where(li => query.CategoryUIDs.Contains(li.CategoryUID));
 
         return await q
             .OrderByDescending(li => li.Date)

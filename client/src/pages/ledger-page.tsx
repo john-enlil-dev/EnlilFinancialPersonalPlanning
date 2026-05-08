@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import {
   Badge,
-  Col,
+  Card,
+  CardBody,
   Container,
   Form,
   FormGroup,
@@ -11,19 +13,23 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
-  Row,
+  Popover,
+  PopoverBody,
   Table,
 } from 'reactstrap';
 import { categoriesApi } from '../api/categories';
 import { lineItemsApi } from '../api/line-items';
+import { queryKeys } from '../api/query-keys';
+import { RenderMultiSelect } from '../UI/functions/render-multi-select';
+import { RenderPageHeader } from '../UI/functions/render-page-header';
 import {
   RenderDefaultButton,
   RenderPrimaryButton,
 } from '../UI/functions/render-skeleton-button-functions';
 import type {
-  Category,
   CreateLineItemRequest,
   LineItem,
+  LineItemQuery,
   UpdateLineItemRequest,
 } from '../types/api';
 import { CategoryDirection, DIRECTION_LABELS, Direction } from '../types/enums';
@@ -61,51 +67,86 @@ const blankForm = (): FormState => ({
 });
 
 export default function LedgerPage() {
-  const [items, setItems] = useState<LineItem[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const [filterDirection, setFilterDirection] = useState<Direction | ''>('');
-  const [filterCategory, setFilterCategory] = useState<string>('');
+  const [filterCategoryUids, setFilterCategoryUids] = useState<string[]>([]);
   const [filterFrom, setFilterFrom] = useState<string>(() => currentMonthRange().from);
   const [filterTo, setFilterTo] = useState<string>(() => currentMonthRange().to);
 
   const [editing, setEditing] = useState<LineItem | null>(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<FormState>(blankForm());
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [li, cats] = await Promise.all([
-        lineItemsApi.list({
-          direction: filterDirection === '' ? undefined : filterDirection,
-          categoryUID: filterCategory || undefined,
-          fromDate: filterFrom || undefined,
-          toDate: filterTo || undefined,
-        }),
-        categoriesApi.list(false),
-      ]);
-      // Newest first. Tiebreak by UID for stable order on same-date rows.
-      const sorted = [...li].sort((a, b) => {
-        if (a.date > b.date) return -1;
-        if (a.date < b.date) return 1;
-        return a.uid.localeCompare(b.uid);
-      });
-      setItems(sorted);
-      setCategories(cats);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load ledger');
-    } finally {
-      setLoading(false);
-    }
+  type FilterKey = 'date' | 'direction' | 'category';
+  const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
+  const toggleFilter = (key: FilterKey) =>
+    setOpenFilter((cur) => (cur === key ? null : key));
+  const closeFilter = () => setOpenFilter(null);
+
+  const defaultRange = currentMonthRange();
+  const dateActive = filterFrom !== defaultRange.from || filterTo !== defaultRange.to;
+  const directionActive = filterDirection !== '';
+  const categoryActive = filterCategoryUids.length > 0;
+
+  const filters: LineItemQuery = {
+    direction: filterDirection === '' ? undefined : filterDirection,
+    categoryUIDs: filterCategoryUids.length > 0 ? filterCategoryUids : undefined,
+    fromDate: filterFrom || undefined,
+    toDate: filterTo || undefined,
   };
 
-  useEffect(() => {
-    void load();
-  }, [filterDirection, filterCategory, filterFrom, filterTo]);
+  const lineItemsQuery = useQuery({
+    queryKey: queryKeys.lineItems.list(filters),
+    queryFn: () => lineItemsApi.list(filters),
+  });
+
+  const categoriesQuery = useQuery({
+    queryKey: queryKeys.categories.list(false),
+    queryFn: () => categoriesApi.list(false),
+  });
+
+  const items = useMemo(() => {
+    const data = lineItemsQuery.data ?? [];
+    return [...data].sort((a, b) => {
+      if (a.date < b.date) return -1;
+      if (a.date > b.date) return 1;
+      return a.uid.localeCompare(b.uid);
+    });
+  }, [lineItemsQuery.data]);
+
+  const total = useMemo(() => {
+    return items.reduce((acc, li) => {
+      const signed = li.direction === Direction.Income ? li.amount : -li.amount;
+      return acc + signed;
+    }, 0);
+  }, [items]);
+
+  const categories = categoriesQuery.data ?? [];
+  const categoryOptions = useMemo(
+    () => categories.map((c) => ({ value: c.uid, label: c.name })),
+    [categories],
+  );
+
+  const createMutation = useMutation({
+    mutationFn: (req: CreateLineItemRequest) => lineItemsApi.create(req),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lineItems.all });
+      closeModal();
+    },
+    onError: (e) => setSubmitError(e instanceof Error ? e.message : 'Save failed'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ uid, req }: { uid: string; req: UpdateLineItemRequest }) =>
+      lineItemsApi.update(uid, req),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lineItems.all });
+      closeModal();
+    },
+    onError: (e) => setSubmitError(e instanceof Error ? e.message : 'Save failed'),
+  });
 
   const eligibleCategories = useMemo(() => {
     return categories.filter((c) => {
@@ -119,6 +160,7 @@ export default function LedgerPage() {
     setForm(blankForm());
     setEditing(null);
     setCreating(true);
+    setSubmitError(null);
   };
 
   const startEdit = (li: LineItem) => {
@@ -131,96 +173,43 @@ export default function LedgerPage() {
     });
     setEditing(li);
     setCreating(false);
+    setSubmitError(null);
   };
 
   const closeModal = () => {
     setEditing(null);
     setCreating(false);
+    setSubmitError(null);
   };
 
-  const submit = async () => {
-    const amount = Number(form.amount);
+  const submit = () => {
     if (!form.categoryUID) {
-      setError('Pick a category');
+      setSubmitError('Pick a category');
       return;
     }
-    try {
-      const payload: CreateLineItemRequest = {
-        direction: form.direction,
-        amount,
-        date: form.date,
-        description: form.description || null,
-        categoryUID: form.categoryUID,
-      };
-      if (creating) {
-        await lineItemsApi.create(payload);
-      } else if (editing) {
-        await lineItemsApi.update(editing.uid, payload as UpdateLineItemRequest);
-      }
-      closeModal();
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+    const payload: CreateLineItemRequest = {
+      direction: form.direction,
+      amount: Number(form.amount),
+      date: form.date,
+      description: form.description || null,
+      categoryUID: form.categoryUID,
+    };
+    if (creating) {
+      createMutation.mutate(payload);
+    } else if (editing) {
+      updateMutation.mutate({ uid: editing.uid, req: payload as UpdateLineItemRequest });
     }
   };
 
-  const renderFilters = () => (
-    <Row className="mb-3 g-2 align-items-end">
-      <Col md="2">
-        <Label for="filter-from">From</Label>
-        <Input
-          id="filter-from"
-          type="date"
-          value={filterFrom}
-          onChange={(e) => setFilterFrom(e.target.value)}
-        />
-      </Col>
-      <Col md="2">
-        <Label for="filter-to">To</Label>
-        <Input
-          id="filter-to"
-          type="date"
-          value={filterTo}
-          onChange={(e) => setFilterTo(e.target.value)}
-        />
-      </Col>
-      <Col md="2">
-        <Label for="filter-direction">Direction</Label>
-        <Input
-          id="filter-direction"
-          type="select"
-          value={filterDirection}
-          onChange={(e) => {
-            const v = e.target.value;
-            setFilterDirection(v === '' ? '' : (Number(v) as Direction));
-          }}
-        >
-          <option value="">All</option>
-          {Object.entries(DIRECTION_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </Input>
-      </Col>
-      <Col md="3">
-        <Label for="filter-category">Category</Label>
-        <Input
-          id="filter-category"
-          type="select"
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
-          <option value="">All</option>
-          {categories.map((c) => (
-            <option key={c.uid} value={c.uid}>
-              {c.name}
-            </option>
-          ))}
-        </Input>
-      </Col>
-    </Row>
-  );
+  const clearDateFilter = () => {
+    const { from, to } = currentMonthRange();
+    setFilterFrom(from);
+    setFilterTo(to);
+  };
+  const clearDirectionFilter = () => setFilterDirection('');
+  const clearCategoryFilter = () => setFilterCategoryUids([]);
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   const renderModal = () => {
     const isOpen = creating || editing !== null;
@@ -301,88 +290,258 @@ export default function LedgerPage() {
                 manually edited so future template re-seeds skip it.
               </p>
             )}
+            {submitError && <p className="text-danger mt-2 mb-0">{submitError}</p>}
           </Form>
         </ModalBody>
         <ModalFooter>
-          <RenderDefaultButton label="Cancel" onClick={closeModal} />
-          <RenderPrimaryButton label="Save" onClick={() => void submit()} />
+          <RenderDefaultButton label="Cancel" onClick={closeModal} disabled={isSubmitting} />
+          <RenderPrimaryButton label="Save" onClick={submit} disabled={isSubmitting} />
         </ModalFooter>
       </Modal>
     );
   };
 
   const renderHeader = () => (
-    <div className="d-flex align-items-center mb-3">
-      <h1 className="me-auto mb-0">Ledger</h1>
-      <RenderPrimaryButton label="New line item" onClick={startCreate} />
-    </div>
+    <RenderPageHeader
+      title="Ledger"
+      subtitle="Track income and expenses across your accounts."
+      rightContent={<RenderPrimaryButton label="New line item" icon="bi-plus-lg" onClick={startCreate} />}
+    />
   );
 
-  const renderTable = () => {
-    if (loading) return <p>Loading...</p>;
-    if (error) return <p className="text-danger">{error}</p>;
-    if (items.length === 0) return <p className="text-muted">No line items match the current filters.</p>;
+  const renderFilterIcon = (key: FilterKey, id: string, isActive: boolean) => (
+    <button
+      id={id}
+      type="button"
+      className={`filter-icon-btn${isActive ? ' is-active' : ''}`}
+      onClick={() => toggleFilter(key)}
+      aria-label={`Filter ${key}`}
+    >
+      <i className={`bi ${isActive ? 'bi-funnel-fill' : 'bi-funnel'}`} aria-hidden="true" />
+    </button>
+  );
 
-    return (
-      <Table hover responsive>
-        <thead>
-          <tr>
-            <th>Date ↓</th>
-            <th>Direction</th>
-            <th className="text-end">Amount</th>
-            <th>Category</th>
-            <th>Description</th>
-            <th>Source</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((li) => {
-            const isIncome = li.direction === Direction.Income;
-            return (
-              <tr key={li.uid}>
-                <td>{li.date}</td>
-                <td>
-                  <Badge color={isIncome ? 'success' : 'danger'} pill>
-                    {DIRECTION_LABELS[li.direction]}
+  const renderDatePopover = () => (
+    <Popover
+      isOpen={openFilter === 'date'}
+      target="filter-icon-date"
+      placement="bottom"
+      toggle={closeFilter}
+      trigger="legacy"
+      popperClassName="filter-popover"
+    >
+      <PopoverBody>
+        <FormGroup>
+          <Label for="popover-from" className="small mb-1">
+            From
+          </Label>
+          <Input
+            id="popover-from"
+            type="date"
+            bsSize="sm"
+            value={filterFrom}
+            onChange={(e) => setFilterFrom(e.target.value)}
+          />
+        </FormGroup>
+        <FormGroup className="mb-2">
+          <Label for="popover-to" className="small mb-1">
+            To
+          </Label>
+          <Input
+            id="popover-to"
+            type="date"
+            bsSize="sm"
+            value={filterTo}
+            onChange={(e) => setFilterTo(e.target.value)}
+          />
+        </FormGroup>
+        <div className="d-flex justify-content-end">
+          <RenderDefaultButton label="Reset to this month" onClick={clearDateFilter} />
+        </div>
+      </PopoverBody>
+    </Popover>
+  );
+
+  const renderDirectionPopover = () => (
+    <Popover
+      isOpen={openFilter === 'direction'}
+      target="filter-icon-direction"
+      placement="bottom"
+      toggle={closeFilter}
+      trigger="legacy"
+      popperClassName="filter-popover"
+    >
+      <PopoverBody>
+        <FormGroup className="mb-2">
+          <Label for="popover-direction" className="small mb-1">
+            Direction
+          </Label>
+          <Input
+            id="popover-direction"
+            type="select"
+            bsSize="sm"
+            value={filterDirection}
+            onChange={(e) => {
+              const v = e.target.value;
+              setFilterDirection(v === '' ? '' : (Number(v) as Direction));
+            }}
+          >
+            <option value="">All</option>
+            {Object.entries(DIRECTION_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Input>
+        </FormGroup>
+        <div className="d-flex justify-content-end">
+          <RenderDefaultButton label="Clear" onClick={clearDirectionFilter} disabled={!directionActive} />
+        </div>
+      </PopoverBody>
+    </Popover>
+  );
+
+  const renderCategoryPopover = () => (
+    <Popover
+      isOpen={openFilter === 'category'}
+      target="filter-icon-category"
+      placement="bottom"
+      toggle={closeFilter}
+      trigger="legacy"
+      popperClassName="filter-popover"
+    >
+      <PopoverBody style={{ minWidth: 280 }}>
+        <FormGroup className="mb-2">
+          <Label className="small mb-1">Categories</Label>
+          <RenderMultiSelect
+            id="popover-categories"
+            options={categoryOptions}
+            selectedValues={filterCategoryUids}
+            onChange={setFilterCategoryUids}
+            placeholder="All categories"
+            size="sm"
+          />
+        </FormGroup>
+        <div className="d-flex justify-content-end">
+          <RenderDefaultButton label="Clear" onClick={clearCategoryFilter} disabled={!categoryActive} />
+        </div>
+      </PopoverBody>
+    </Popover>
+  );
+
+  const renderTableContent = () => {
+    if (lineItemsQuery.isLoading)
+      return (
+        <tr>
+          <td colSpan={7} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
+    if (lineItemsQuery.error)
+      return (
+        <tr>
+          <td colSpan={7} className="text-center text-danger py-3">
+            {lineItemsQuery.error instanceof Error
+              ? lineItemsQuery.error.message
+              : 'Failed to load ledger'}
+          </td>
+        </tr>
+      );
+    if (items.length === 0)
+      return (
+        <tr>
+          <td colSpan={7} className="text-center text-muted py-3">
+            No line items match the current filters.
+          </td>
+        </tr>
+      );
+
+    return items.map((li) => {
+      const isIncome = li.direction === Direction.Income;
+      return (
+        <tr key={li.uid}>
+          <td>{li.date}</td>
+          <td>
+            <Badge color={isIncome ? 'success' : 'danger'} pill>
+              {DIRECTION_LABELS[li.direction]}
+            </Badge>
+          </td>
+          <td className={`text-end fw-semibold ${isIncome ? 'text-income' : 'text-expense'}`}>
+            {isIncome ? '+' : '−'}
+            {li.amount.toFixed(2)}
+          </td>
+          <td>{li.categoryName}</td>
+          <td>{li.description ?? '—'}</td>
+          <td>
+            {li.sourceTemplateName ? (
+              <span title={li.wasManuallyEdited ? 'Manually edited' : 'Auto-seeded'}>
+                {li.sourceTemplateName}
+                {li.wasManuallyEdited && (
+                  <Badge color="warning" pill className="ms-2">
+                    edited
                   </Badge>
-                </td>
-                <td className={`text-end fw-semibold ${isIncome ? 'text-income' : 'text-expense'}`}>
-                  {isIncome ? '+' : '−'}
-                  {li.amount.toFixed(2)}
-                </td>
-                <td>{li.categoryName}</td>
-                <td>{li.description ?? '—'}</td>
-                <td>
-                  {li.sourceTemplateName ? (
-                    <span title={li.wasManuallyEdited ? 'Manually edited' : 'Auto-seeded'}>
-                      {li.sourceTemplateName}
-                      {li.wasManuallyEdited && (
-                        <Badge color="warning" pill className="ms-2">
-                          edited
-                        </Badge>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-muted">manual</span>
-                  )}
-                </td>
-                <td>
-                  <RenderDefaultButton label="Edit" onClick={() => startEdit(li)} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </Table>
-    );
+                )}
+              </span>
+            ) : (
+              <span className="text-muted">manual</span>
+            )}
+          </td>
+          <td>
+            <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(li)} />
+          </td>
+        </tr>
+      );
+    });
   };
 
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>
+            Date ↑
+            {renderFilterIcon('date', 'filter-icon-date', dateActive)}
+          </th>
+          <th>
+            Direction
+            {renderFilterIcon('direction', 'filter-icon-direction', directionActive)}
+          </th>
+          <th className="text-end">Amount</th>
+          <th>
+            Category
+            {renderFilterIcon('category', 'filter-icon-category', categoryActive)}
+          </th>
+          <th>Description</th>
+          <th>Source</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+      <tfoot>
+        <tr>
+          <td colSpan={2}>Total</td>
+          <td
+            className={`text-end fw-semibold ${total >= 0 ? 'text-income' : 'text-expense'}`}
+          >
+            {total >= 0 ? '+' : '−'}
+            {Math.abs(total).toFixed(2)}
+          </td>
+          <td colSpan={4} />
+        </tr>
+      </tfoot>
+    </Table>
+  );
+
   return (
-    <Container className="py-4">
+    <Container fluid className="py-4">
       {renderHeader()}
-      {renderFilters()}
-      {renderTable()}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
+      {renderDatePopover()}
+      {renderDirectionPopover()}
+      {renderCategoryPopover()}
       {renderModal()}
     </Container>
   );

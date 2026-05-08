@@ -22,6 +22,20 @@ builder.Services.AddScoped<LineItemManager>();
 builder.Services.AddScoped<RecurringTemplateManager>();
 builder.Services.AddScoped<ITemplateSeederService, TemplateSeederService>();
 
+builder.Services.AddScoped<LongTermContainerManager>();
+builder.Services.AddScoped<HoldingManager>();
+builder.Services.AddScoped<LongTermItemManager>();
+builder.Services.AddScoped<RetirementContainerManager>();
+builder.Services.AddScoped<RetirementHoldingManager>();
+builder.Services.AddScoped<SimpleAssetManager>();
+builder.Services.AddScoped<SavingsManager>();
+builder.Services.AddScoped<CreditCardDebtManager>();
+builder.Services.AddScoped<MortgageDebtManager>();
+builder.Services.AddScoped<LineItemAllocationManager>();
+
+builder.Services.AddScoped<IMortgageAmortizationService, MortgageAmortizationService>();
+builder.Services.AddScoped<IBalanceAffectService, BalanceAffectService>();
+
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddFluentValidationAutoValidation();
 

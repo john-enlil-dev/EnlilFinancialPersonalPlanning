@@ -7,5 +7,5 @@ public sealed class LineItemQuery
     public DateOnly? FromDate { get; set; }
     public DateOnly? ToDate { get; set; }
     public Direction? Direction { get; set; }
-    public Guid? CategoryUID { get; set; }
+    public List<Guid> CategoryUIDs { get; set; } = new();
 }

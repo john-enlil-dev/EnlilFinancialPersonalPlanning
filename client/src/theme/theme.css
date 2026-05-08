@@ -8,16 +8,266 @@
   --enlil-expense: #ef4444;
   --enlil-expense-soft: rgba(239, 68, 68, 0.12);
 
-  --enlil-accent: #6366f1;
-  --enlil-accent-soft: rgba(99, 102, 241, 0.18);
+  /* Accent purple — single source for primary buttons, focus rings,
+     sidebar active state, dashboard card borders. Aligned with --enlil-divider
+     so HRs and primary surfaces share one purple. */
+  --enlil-accent: #6b21a8;
+  --enlil-accent-soft: rgba(107, 33, 168, 0.22);
+  --enlil-accent-bright: #8b5cf6;
+  --enlil-accent-deep: #581c87;
 
-  --enlil-card-border: rgba(255, 255, 255, 0.08);
+  /* Deep purple — used for breaks, dividers, and card barriers. */
+  --enlil-divider: #6b21a8;
+  --enlil-divider-soft: rgba(107, 33, 168, 0.45);
+
+  --enlil-card-border: rgba(107, 33, 168, 0.45);
   --enlil-surface: #1a1d23;
   --enlil-surface-elevated: #20242c;
+  /* Opaque elevated surface used for sticky table headers/footers — must be
+     opaque so scrolling rows don't show through. */
+  --enlil-table-band-bg: #292d35;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  /* No horizontal scroll, ever — applies at the document level so any
+     descendant accidentally exceeding viewport width gets clipped instead
+     of producing a page-wide horizontal scrollbar. */
+  overflow-x: hidden;
 }
 
 body {
   background-color: var(--enlil-surface);
+  overflow-x: hidden;
+}
+
+/* App shell: mini-rail sidebar on the left, route content fills the rest.
+   The .app-main element is what scrolls when a page's content overflows;
+   the body itself never scrolls, so pages like the ledger can constrain
+   themselves to .app-main and own their internal scrolling. */
+.app-shell {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+}
+.app-main {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* ---- Mini-rail sidebar ---------------------------------------------------
+   Collapsed by default to a 64px rail showing icons only. Expands to 240px
+   on hover or keyboard focus to reveal labels and section headers. The
+   content area reflows by 176px when expanded — fast (180ms) transition
+   keeps the layout shift unobtrusive. */
+.app-sidebar {
+  flex: 0 0 64px;
+  background-color: var(--enlil-surface-elevated);
+  border-right: 1px solid var(--enlil-divider-soft);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: flex-basis 0.18s ease;
+  z-index: 1030;
+  position: relative;
+}
+.app-sidebar:hover,
+.app-sidebar:focus-within {
+  flex-basis: 240px;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--enlil-divider-soft);
+  color: var(--enlil-accent);
+  white-space: nowrap;
+}
+.sidebar-brand-text {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.sidebar-nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.5rem 0;
+}
+
+.sidebar-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.sidebar-sections {
+  margin-top: 0.5rem;
+}
+.sidebar-section {
+  padding-top: 0.75rem;
+  padding-bottom: 0.25rem;
+  border-top: 1px solid var(--enlil-divider-soft);
+}
+.sidebar-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 0.25rem 1rem 0.25rem;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  height: 1.5rem;
+}
+.app-sidebar:hover .sidebar-section-title,
+.app-sidebar:focus-within .sidebar-section-title {
+  opacity: 1;
+}
+
+.sidebar-item {
+  list-style: none;
+}
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.55rem 1rem;
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+  white-space: nowrap;
+  border-left: 3px solid transparent;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.sidebar-link:hover {
+  background-color: rgba(107, 33, 168, 0.12);
+  color: rgba(255, 255, 255, 0.95);
+}
+.sidebar-link-active {
+  color: #ffffff;
+  background-color: var(--enlil-accent-soft);
+  border-left-color: var(--enlil-accent);
+}
+
+.sidebar-icon {
+  font-size: 1.2rem;
+  flex: 0 0 1.5rem;
+  display: inline-block;
+  text-align: center;
+}
+.sidebar-label {
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.app-sidebar:hover .sidebar-label,
+.app-sidebar:focus-within .sidebar-label {
+  opacity: 1;
+}
+
+/* ---- Buttons -------------------------------------------------------------
+   All buttons go through RenderPrimaryButton / RenderDefaultButton /
+   RenderDangerButton, which apply .enlil-btn plus a variant class. We
+   override Bootstrap 5.3's btn CSS variables here rather than fighting
+   selectors; the lift / shadow / weight rules are shared across variants. */
+.enlil-btn {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-width: 1px;
+  border-radius: 0.5rem;
+  padding-inline: 1rem;
+  padding-block: 0.45rem;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.18s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    filter 0.15s ease;
+  will-change: transform;
+}
+.enlil-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+}
+.enlil-btn:not(:disabled):active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  filter: brightness(0.95);
+}
+.enlil-btn:focus-visible {
+  outline: 2px solid var(--enlil-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--enlil-accent-soft);
+}
+.enlil-btn-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.enlil-btn-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Default — was washed-out outline-secondary on dark bg. Now: clear white
+   border, subtle bg tint, snaps to accent on hover. The hover state is the
+   real upgrade — Edit buttons used to disappear; now they pop. */
+.enlil-btn-default {
+  --bs-btn-bg: rgba(255, 255, 255, 0.06);
+  --bs-btn-border-color: rgba(255, 255, 255, 0.22);
+  --bs-btn-color: rgba(255, 255, 255, 0.92);
+  --bs-btn-hover-bg: var(--enlil-accent-soft);
+  --bs-btn-hover-border-color: var(--enlil-accent);
+  --bs-btn-hover-color: #ffffff;
+  --bs-btn-active-bg: rgba(107, 33, 168, 0.4);
+  --bs-btn-active-border-color: var(--enlil-accent);
+  --bs-btn-active-color: #ffffff;
+  --bs-btn-disabled-bg: rgba(255, 255, 255, 0.03);
+  --bs-btn-disabled-border-color: rgba(255, 255, 255, 0.1);
+  --bs-btn-disabled-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Primary — accent-filled (matches HR purple), brightens on hover, deepens on press. */
+.enlil-btn-primary {
+  --bs-btn-bg: var(--enlil-accent);
+  --bs-btn-border-color: var(--enlil-accent);
+  --bs-btn-color: #ffffff;
+  --bs-btn-hover-bg: var(--enlil-accent-bright);
+  --bs-btn-hover-border-color: var(--enlil-accent-bright);
+  --bs-btn-hover-color: #ffffff;
+  --bs-btn-active-bg: var(--enlil-accent-deep);
+  --bs-btn-active-border-color: var(--enlil-accent-deep);
+  --bs-btn-active-color: #ffffff;
+}
+.enlil-btn-primary:not(:disabled):hover {
+  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.45);
+}
+
+/* Danger — red-filled with the same lift treatment as primary. */
+.enlil-btn-danger {
+  --bs-btn-bg: var(--enlil-expense);
+  --bs-btn-border-color: var(--enlil-expense);
+  --bs-btn-color: #ffffff;
+  --bs-btn-hover-bg: #f87171;
+  --bs-btn-hover-border-color: #f87171;
+  --bs-btn-hover-color: #ffffff;
+  --bs-btn-active-bg: #b91c1c;
+  --bs-btn-active-border-color: #b91c1c;
+  --bs-btn-active-color: #ffffff;
+}
+.enlil-btn-danger:not(:disabled):hover {
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.45);
 }
 
 /* Income / expense semantic helpers — used in tables, badges, totals. */
@@ -34,10 +284,167 @@ body {
   background-color: var(--enlil-expense-soft);
 }
 
-/* Cards get a subtle border + accent on hover. */
+/* Stat-card labels — used in compact "label · value" stat rows. Stronger than
+   plain muted small text: uppercase, tracked, semibold. */
+.stat-card-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* Summary header grid — fixed 5 columns × 2 rows on lg+, drops to 2 columns
+   on mobile so values still read cleanly. */
+.summary-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.85rem 1.25rem;
+}
+@media (max-width: 991.98px) {
+  .summary-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 575.98px) {
+  .summary-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mortgage detail page — fills viewport height so the Line Items tab can
+   own its own scroll on the table card while the page header, summary, and
+   tab strip stay frozen at the top. Overview pane keeps natural scrolling. */
+.mortgage-detail-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.mortgage-detail-page > .tab-content {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mortgage-detail-page > .tab-content > .tab-pane {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.mortgage-detail-page > .tab-content > .tab-pane.active {
+  display: flex;
+  flex-direction: column;
+}
+/* Overview keeps page-style natural scroll inside the pane.
+   overflow-x explicitly hidden — without it the spec computes overflow-x to
+   auto (because overflow-y is auto), producing a phantom horizontal scrollbar. */
+.mortgage-detail-page .overview-pane.active {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* Line items pane fills the remaining vertical space; the card inside
+   becomes the scroll container with the sticky thead defined globally. */
+.mortgage-detail-page .line-items-pane.active {
+  overflow: hidden;
+}
+.line-items-pane.active > .card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.line-items-pane.active > .card > .card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.line-items-pane.active > .card > .card-body > .table-responsive {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Year-cards scroll region — caps visible height so years scroll instead of
+   stretching the overview column past the charts on the right. The cap is
+   roughly the combined height of the two stacked charts. */
+.year-cards-scroll {
+  max-height: 540px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 0.25rem; /* breathing room for the scrollbar */
+}
+.year-cards-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.year-cards-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.year-cards-scroll::-webkit-scrollbar-thumb {
+  background: var(--enlil-divider-soft);
+  border-radius: 4px;
+}
+
+/* Year-card breakdown — three equal-width "table" columns inside each year
+   card so Principal / Interest / Escrow align across stacked cards. */
+.year-card-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem 0.75rem;
+  align-items: end;
+}
+.year-card-breakdown .year-cell-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  display: block;
+  line-height: 1;
+  margin-bottom: 0.2rem;
+}
+.year-card-breakdown .year-cell-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.year-card-breakdown .year-cell-extra {
+  font-size: 0.7rem;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.5);
+  display: block;
+  line-height: 1.1;
+}
+/* Stat-card subtitles — italic + lighter so they read as supporting commentary
+   rather than another label. */
+.stat-card-subtitle {
+  font-style: italic;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* In-table row links — drill into a detail page from a list. */
+.enlil-row-link {
+  color: rgba(255, 255, 255, 0.92);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px dotted transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.enlil-row-link:hover {
+  color: var(--enlil-accent-bright);
+  border-bottom-color: var(--enlil-accent-bright);
+}
+
+/* Cards get a subtle deep-purple border + softer rounded corners.
+   overflow: hidden clips flush children (e.g. tables with no body padding)
+   to the card's rounded corners. */
 .card {
   background-color: var(--enlil-surface-elevated);
   border-color: var(--enlil-card-border);
+  border-radius: 0.75rem;
+  overflow: hidden;
 }
 
 .dashboard-card {
@@ -46,24 +453,200 @@ body {
 }
 .dashboard-card:hover {
   transform: translateY(-2px);
-  border-left-color: #818cf8;
+  border-left-color: var(--enlil-accent-bright);
 }
 
-/* Tables — give the header row a touch of accent and tighten spacing. */
+/* Tables — give the header row real weight and tighten spacing. */
 .table {
   --bs-table-bg: transparent;
 }
 .table thead th {
-  border-bottom: 1px solid var(--enlil-card-border);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  background-color: var(--enlil-table-band-bg);
+  border-top: 1px solid var(--enlil-divider-soft);
+  border-bottom: 2px solid var(--enlil-divider);
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.85);
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  /* Stick to the top of the scrolling table body so column headers stay
+     visible while rows scroll. No-op in non-scrolling contexts. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* Filter icon button — sits next to a column title and opens a popover
+   with that column's filter UI. Tiny, unstyled, accent on hover/active. */
+.filter-icon-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 0.05rem 0.3rem;
+  margin-left: 0.35rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.filter-icon-btn:hover {
+  color: var(--enlil-accent-bright);
+  background-color: rgba(139, 92, 246, 0.12);
+}
+.filter-icon-btn.is-active {
+  color: var(--enlil-accent-bright);
+}
+.filter-icon-btn.is-active::after {
+  content: '';
+  position: relative;
+  top: -6px;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background-color: var(--enlil-accent-bright);
+}
+
+/* Filter popover — Reactstrap Popover gets dark surfaces + purple border
+   so it matches the rest of the chrome. */
+.filter-popover.popover {
+  background-color: var(--enlil-surface-elevated);
+  border: 1px solid var(--enlil-card-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --bs-popover-bg: var(--enlil-surface-elevated);
+  --bs-popover-border-color: var(--enlil-card-border);
+  --bs-popover-header-bg: transparent;
+  --bs-popover-header-color: rgba(255, 255, 255, 0.85);
+  --bs-popover-body-color: rgba(255, 255, 255, 0.92);
+  min-width: 240px;
+}
+.filter-popover .popover-arrow::before,
+.filter-popover .popover-arrow::after {
+  border-bottom-color: var(--enlil-card-border) !important;
+}
+
+/* Table footer — used for totals / summary rows. */
+.table tfoot td {
+  background-color: var(--enlil-table-band-bg);
+  border-top: 2px solid var(--enlil-divider);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.85);
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  /* Stick to the bottom of the scrolling table body so totals stay
+     visible. No-op in non-scrolling contexts. */
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 
 /* Page header h1 — slightly tighter, more deliberate. */
 h1 {
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+/* Reusable page header — sits at the top of every page. */
+.page-header {
+  border-bottom: 2px solid var(--enlil-divider);
+}
+.page-header-title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0;
+}
+.page-header-subtitle {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.9rem;
+}
+
+/* Page-with-sidebar shell: occupies the full viewport with no page-level
+   scroll. The main column flexes to fill available space; the table card
+   inside scrolls vertically while the page header and sidebar stay put. */
+.page-with-sidebar {
+  display: flex;
+  align-items: stretch;
+  gap: 1.5rem;
+  padding-right: 1.5rem;
+  /* Fills .app-main (= viewport minus navbar). The shell itself never
+     scrolls; the table card inside owns its own internal scroll. */
+  height: 100%;
+  overflow: hidden;
+}
+.page-with-sidebar > .page-main {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* The table card inside page-main fills remaining vertical space; its body
+   becomes the scroll container for the table rows. */
+.page-main > .card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.page-main > .card > .card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.page-main > .card > .card-body > .table-responsive {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.page-sidebar {
+  flex: 0 0 280px;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+@media (max-width: 991.98px) {
+  .page-with-sidebar {
+    flex-direction: column;
+    padding-right: 0;
+    /* On mobile, give up internal scrolling — the column stack just lives
+       inside .app-main and that scrolls naturally. */
+    height: auto;
+    overflow: visible;
+  }
+  .page-with-sidebar > .page-main {
+    min-height: 0;
+  }
+  .page-main > .card {
+    flex: 0 1 auto;
+  }
+  .page-main > .card > .card-body {
+    overflow: visible;
+  }
+  .page-main > .card > .card-body > .table-responsive {
+    height: auto;
+  }
+  .page-sidebar {
+    flex: 1 1 auto;
+    width: 100%;
+    padding-top: 0;
+    overflow-y: visible;
+  }
+}
+.filter-sidebar-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 1rem;
 }

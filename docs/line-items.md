@@ -57,6 +57,15 @@ First domain primitive of the financial planning app: a record of money flowing 
   - Slice 4 — frontend types + enum tables + `axios` API client + `react-router-dom` routing + `NavBar` + dashboard placeholder.
   - Slice 5 — `categories-page`, `ledger-page`, `templates-page`. Templates page renders per-cadence form fields dynamically (Monthly = day-of-month + last-day toggle; Weekly/BiWeekly = day-of-week; Quarterly = month-of-quarter + day; Annually = month + day; CustomDays = interval).
 
+## Frontend caching layer (2026-04-30)
+- **TanStack Query (React Query v5).** Added `@tanstack/react-query` + `@tanstack/react-query-devtools`. `QueryClientProvider` wraps the app in `main.tsx` with defaults: `staleTime: 30s`, `gcTime: 5min`, `refetchOnWindowFocus: false`, `retry: 1`.
+- **Query keys centralized in `client/src/api/query-keys.ts`** (`queryKeys.categories`, `queryKeys.lineItems`, `queryKeys.recurringTemplates`) so invalidation paths are typed and consistent.
+- **All three CRUD pages converted to `useQuery` + `useMutation`.** Loading / error state handled by TanStack instead of `useState` + `useEffect`. Mutations invalidate the relevant root query key on success — template mutations also invalidate the line-items key since seeding adds/removes ledger rows.
+- **DevTools enabled in dev only** (`import.meta.env.DEV` gate) — bottom-right button shows query state for debugging cache invalidation.
+
+## Ledger sort direction (2026-04-30)
+- **Flipped to ascending.** User wanted oldest at top, newest at bottom — chronological reading order, more natural for a current-month ledger view. Header shows `Date ↑`. Backend still returns descending; frontend re-sorts ascending after fetch.
+
 ## Theme baseline (2026-04-30)
 - **Dark mode default via Bootstrap 5.3's `data-bs-theme="dark"`** on `<html>` in `index.html`. Reactstrap components inherit it; navbar / cards / tables / inputs / modals all render in dark variants automatically.
 - **Semantic color tokens in `client/src/theme/theme.css`** as CSS variables (`--enlil-income` green, `--enlil-expense` red, `--enlil-accent` indigo) with helper classes (`text-income`, `text-expense`, `bg-income-soft`, `bg-expense-soft`). To shift the palette later, edit the variables in one place.

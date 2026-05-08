@@ -8,7 +8,17 @@ import type {
 
 export const lineItemsApi = {
   list: async (query: LineItemQuery = {}): Promise<LineItem[]> => {
-    const res = await apiClient.get<LineItem[]>('/lineitems', { params: query });
+    // ASP.NET Core's query-string model binder wants repeated keys for collections
+    // (?CategoryUIDs=g1&CategoryUIDs=g2). Build the params explicitly so axios's
+    // array-serialization quirks don't matter.
+    const params = new URLSearchParams();
+    if (query.fromDate) params.append('FromDate', query.fromDate);
+    if (query.toDate) params.append('ToDate', query.toDate);
+    if (query.direction !== undefined) params.append('Direction', String(query.direction));
+    if (query.categoryUIDs) {
+      for (const uid of query.categoryUIDs) params.append('CategoryUIDs', uid);
+    }
+    const res = await apiClient.get<LineItem[]>('/lineitems', { params });
     return res.data;
   },
 

@@ -5,28 +5,56 @@ interface ButtonProps {
   onClick?: () => void;
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
+  icon?: string;
 }
 
-export function RenderPrimaryButton({ label, onClick, disabled, type = 'button' }: ButtonProps) {
+function renderContent(label: string, icon?: string) {
   return (
-    <Button color="primary" onClick={onClick} disabled={disabled} type={type}>
-      {label}
+    <span className="enlil-btn-content">
+      {icon && <i className={`bi ${icon} enlil-btn-icon`} aria-hidden="true" />}
+      <span>{label}</span>
+    </span>
+  );
+}
+
+export function RenderPrimaryButton({ label, onClick, disabled, type = 'button', icon }: ButtonProps) {
+  return (
+    <Button
+      color="primary"
+      className="enlil-btn enlil-btn-primary"
+      onClick={onClick}
+      disabled={disabled}
+      type={type}
+    >
+      {renderContent(label, icon)}
     </Button>
   );
 }
 
-export function RenderDefaultButton({ label, onClick, disabled, type = 'button' }: ButtonProps) {
+export function RenderDefaultButton({ label, onClick, disabled, type = 'button', icon }: ButtonProps) {
   return (
-    <Button color="secondary" outline onClick={onClick} disabled={disabled} type={type}>
-      {label}
+    <Button
+      color="secondary"
+      className="enlil-btn enlil-btn-default"
+      onClick={onClick}
+      disabled={disabled}
+      type={type}
+    >
+      {renderContent(label, icon)}
     </Button>
   );
 }
 
-export function RenderDangerButton({ label, onClick, disabled, type = 'button' }: ButtonProps) {
+export function RenderDangerButton({ label, onClick, disabled, type = 'button', icon }: ButtonProps) {
   return (
-    <Button color="danger" onClick={onClick} disabled={disabled} type={type}>
-      {label}
+    <Button
+      color="danger"
+      className="enlil-btn enlil-btn-danger"
+      onClick={onClick}
+      disabled={disabled}
+      type={type}
+    >
+      {renderContent(label, icon)}
     </Button>
   );
 }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
   Badge,
   Container,
@@ -13,6 +14,7 @@ import {
   Table,
 } from 'reactstrap';
 import { categoriesApi } from '../api/categories';
+import { queryKeys } from '../api/query-keys';
 import {
   RenderDefaultButton,
   RenderPrimaryButton,
@@ -35,34 +37,47 @@ const blankForm: FormState = {
 };
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   const [includeArchived, setIncludeArchived] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<FormState>(blankForm);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setCategories(await categoriesApi.list(includeArchived));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load categories');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: categories = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: queryKeys.categories.list(includeArchived),
+    queryFn: () => categoriesApi.list(includeArchived),
+  });
 
-  useEffect(() => {
-    void load();
-  }, [includeArchived]);
+  const createMutation = useMutation({
+    mutationFn: (req: CreateCategoryRequest) => categoriesApi.create(req),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
+      closeModal();
+    },
+    onError: (e) => setSubmitError(e instanceof Error ? e.message : 'Save failed'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ uid, req }: { uid: string; req: UpdateCategoryRequest }) =>
+      categoriesApi.update(uid, req),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
+      closeModal();
+    },
+    onError: (e) => setSubmitError(e instanceof Error ? e.message : 'Save failed'),
+  });
 
   const startCreate = () => {
     setForm(blankForm);
     setEditing(null);
     setCreating(true);
+    setSubmitError(null);
   };
 
   const startEdit = (c: Category) => {
@@ -74,37 +89,36 @@ export default function CategoriesPage() {
     });
     setEditing(c);
     setCreating(false);
+    setSubmitError(null);
   };
 
   const closeModal = () => {
     setEditing(null);
     setCreating(false);
+    setSubmitError(null);
   };
 
-  const submit = async () => {
-    try {
-      if (creating) {
-        const req: CreateCategoryRequest = {
-          name: form.name,
-          direction: form.direction,
-          description: form.description || null,
-        };
-        await categoriesApi.create(req);
-      } else if (editing) {
-        const req: UpdateCategoryRequest = {
+  const submit = () => {
+    if (creating) {
+      createMutation.mutate({
+        name: form.name,
+        direction: form.direction,
+        description: form.description || null,
+      });
+    } else if (editing) {
+      updateMutation.mutate({
+        uid: editing.uid,
+        req: {
           name: form.name,
           direction: form.direction,
           description: form.description || null,
           isArchived: form.isArchived,
-        };
-        await categoriesApi.update(editing.uid, req);
-      }
-      closeModal();
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+        },
+      });
     }
   };
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   const renderModal = () => {
     const isOpen = creating || editing !== null;
@@ -160,11 +174,12 @@ export default function CategoriesPage() {
                 </Label>
               </FormGroup>
             )}
+            {submitError && <p className="text-danger mt-2 mb-0">{submitError}</p>}
           </Form>
         </ModalBody>
         <ModalFooter>
-          <RenderDefaultButton label="Cancel" onClick={closeModal} />
-          <RenderPrimaryButton label="Save" onClick={() => void submit()} />
+          <RenderDefaultButton label="Cancel" onClick={closeModal} disabled={isSubmitting} />
+          <RenderPrimaryButton label="Save" onClick={submit} disabled={isSubmitting} />
         </ModalFooter>
       </Modal>
     );
@@ -189,8 +204,8 @@ export default function CategoriesPage() {
   );
 
   const renderTable = () => {
-    if (loading) return <p>Loading...</p>;
-    if (error) return <p className="text-danger">{error}</p>;
+    if (isLoading) return <p>Loading...</p>;
+    if (error) return <p className="text-danger">{error instanceof Error ? error.message : 'Failed to load categories'}</p>;
     if (categories.length === 0) return <p className="text-muted">No categories yet.</p>;
 
     return (
@@ -233,7 +248,7 @@ export default function CategoriesPage() {
                   )}
                 </td>
                 <td>
-                  <RenderDefaultButton label="Edit" onClick={() => startEdit(c)} />
+                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(c)} />
                 </td>
               </tr>
             );

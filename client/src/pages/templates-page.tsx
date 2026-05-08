@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import {
   Badge,
   Container,
@@ -13,13 +14,13 @@ import {
   Table,
 } from 'reactstrap';
 import { categoriesApi } from '../api/categories';
+import { queryKeys } from '../api/query-keys';
 import { recurringTemplatesApi } from '../api/recurring-templates';
 import {
   RenderDefaultButton,
   RenderPrimaryButton,
 } from '../UI/functions/render-skeleton-button-functions';
 import type {
-  Category,
   CreateRecurringTemplateRequest,
   RecurringTemplate,
   UpdateRecurringTemplateRequest,
@@ -51,7 +52,13 @@ interface FormState {
   intervalDays: string;
 }
 
-const todayIso = (): string => new Date().toISOString().slice(0, 10);
+const todayIso = (): string => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
 
 const blankForm = (): FormState => ({
   name: '',
@@ -102,32 +109,50 @@ const summarizeCadence = (t: RecurringTemplate): string => {
 };
 
 export default function TemplatesPage() {
-  const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState<RecurringTemplate | null>(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<FormState>(blankForm());
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [tpls, cats] = await Promise.all([recurringTemplatesApi.list(), categoriesApi.list(false)]);
-      setTemplates(tpls);
-      setCategories(cats);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load templates');
-    } finally {
-      setLoading(false);
-    }
+  const templatesQuery = useQuery({
+    queryKey: queryKeys.recurringTemplates.list(),
+    queryFn: () => recurringTemplatesApi.list(),
+  });
+
+  const categoriesQuery = useQuery({
+    queryKey: queryKeys.categories.list(false),
+    queryFn: () => categoriesApi.list(false),
+  });
+
+  const templates = templatesQuery.data ?? [];
+  const categories = categoriesQuery.data ?? [];
+
+  const invalidateAfterMutation = () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.recurringTemplates.all });
+    // Templates seed/re-seed line items, so invalidate the ledger too.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.lineItems.all });
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  const createMutation = useMutation({
+    mutationFn: (req: CreateRecurringTemplateRequest) => recurringTemplatesApi.create(req),
+    onSuccess: () => {
+      invalidateAfterMutation();
+      closeModal();
+    },
+    onError: (e) => setSubmitError(e instanceof Error ? e.message : 'Save failed'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ uid, req }: { uid: string; req: UpdateRecurringTemplateRequest }) =>
+      recurringTemplatesApi.update(uid, req),
+    onSuccess: () => {
+      invalidateAfterMutation();
+      closeModal();
+    },
+    onError: (e) => setSubmitError(e instanceof Error ? e.message : 'Save failed'),
+  });
 
   const eligibleCategories = useMemo(() => {
     return categories.filter((c) => {
@@ -141,6 +166,7 @@ export default function TemplatesPage() {
     setForm(blankForm());
     setEditing(null);
     setCreating(true);
+    setSubmitError(null);
   };
 
   const startEdit = (t: RecurringTemplate) => {
@@ -162,16 +188,18 @@ export default function TemplatesPage() {
     });
     setEditing(t);
     setCreating(false);
+    setSubmitError(null);
   };
 
   const closeModal = () => {
     setEditing(null);
     setCreating(false);
+    setSubmitError(null);
   };
 
-  const submit = async () => {
+  const submit = () => {
     if (!form.categoryUID) {
-      setError('Pick a category');
+      setSubmitError('Pick a category');
       return;
     }
 
@@ -192,18 +220,14 @@ export default function TemplatesPage() {
       intervalDays: form.intervalDays === '' ? null : Number(form.intervalDays),
     };
 
-    try {
-      if (creating) {
-        await recurringTemplatesApi.create(payload);
-      } else if (editing) {
-        await recurringTemplatesApi.update(editing.uid, payload as UpdateRecurringTemplateRequest);
-      }
-      closeModal();
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+    if (creating) {
+      createMutation.mutate(payload);
+    } else if (editing) {
+      updateMutation.mutate({ uid: editing.uid, req: payload as UpdateRecurringTemplateRequest });
     }
   };
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   const renderDayOfMonthBlock = () => (
     <>
@@ -467,11 +491,12 @@ export default function TemplatesPage() {
               </Input>
             </FormGroup>
             {renderCadenceFields()}
+            {submitError && <p className="text-danger mt-2 mb-0">{submitError}</p>}
           </Form>
         </ModalBody>
         <ModalFooter>
-          <RenderDefaultButton label="Cancel" onClick={closeModal} />
-          <RenderPrimaryButton label="Save" onClick={() => void submit()} />
+          <RenderDefaultButton label="Cancel" onClick={closeModal} disabled={isSubmitting} />
+          <RenderPrimaryButton label="Save" onClick={submit} disabled={isSubmitting} />
         </ModalFooter>
       </Modal>
     );
@@ -485,8 +510,15 @@ export default function TemplatesPage() {
   );
 
   const renderTable = () => {
-    if (loading) return <p>Loading...</p>;
-    if (error) return <p className="text-danger">{error}</p>;
+    if (templatesQuery.isLoading) return <p>Loading...</p>;
+    if (templatesQuery.error)
+      return (
+        <p className="text-danger">
+          {templatesQuery.error instanceof Error
+            ? templatesQuery.error.message
+            : 'Failed to load templates'}
+        </p>
+      );
     if (templates.length === 0) return <p className="text-muted">No recurring templates yet.</p>;
 
     return (
@@ -523,7 +555,7 @@ export default function TemplatesPage() {
                 <td>{t.endDate ?? '—'}</td>
                 <td>{t.categoryName}</td>
                 <td>
-                  <RenderDefaultButton label="Edit" onClick={() => startEdit(t)} />
+                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(t)} />
                 </td>
               </tr>
             );
