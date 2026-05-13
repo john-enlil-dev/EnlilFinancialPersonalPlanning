@@ -21,4 +21,10 @@ public sealed class LineItemAllocation
     // First-of-month convention — the day component is irrelevant. Null means use the
     // parent LineItem's Date directly when grouping by month.
     public DateOnly? BillingMonth { get; set; }
+
+    // Free-form tag used for grouping allocations across the same linked entity, separate
+    // from the global Categories table. v1 driver: savings transaction tagging (e.g.,
+    // "Vacation", "Emergency fund", "Bonus") so per-tag metrics are possible without a
+    // dedicated lookup table.
+    public string? Tag { get; set; }
 }

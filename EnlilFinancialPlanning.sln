@@ -4,6 +4,8 @@ VisualStudioVersion = 17.12.35527.113
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnlilFinancialPlanning.Api", "EnlilFinancialPlanning.Api\EnlilFinancialPlanning.Api.csproj", "{8B7CFD42-3A91-4E2F-9D5C-7E8F1A2B3C4D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnlilFinancialPlanning.Api.Tests", "EnlilFinancialPlanning.Api.Tests\EnlilFinancialPlanning.Api.Tests.csproj", "{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "client", "client", "{F2A1D5E6-9C8B-4D3E-A1F2-B3C4D5E6F7A8}"
 	ProjectSection(SolutionItems) = preProject
 		client\package.json = client\package.json
@@ -30,6 +32,10 @@ Global
 		{8B7CFD42-3A91-4E2F-9D5C-7E8F1A2B3C4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8B7CFD42-3A91-4E2F-9D5C-7E8F1A2B3C4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8B7CFD42-3A91-4E2F-9D5C-7E8F1A2B3C4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

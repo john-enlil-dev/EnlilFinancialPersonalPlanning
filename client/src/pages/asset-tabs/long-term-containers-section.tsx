@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
+  Card,
+  CardBody,
   Form,
   FormGroup,
   Input,
@@ -123,43 +125,63 @@ export default function LongTermContainersSection() {
     );
   };
 
+  const renderTableContent = () => {
+    if (isLoading)
+      return (
+        <tr>
+          <td colSpan={5} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
+    if (containers.length === 0)
+      return (
+        <tr>
+          <td colSpan={5} className="text-center text-muted py-3">
+            No containers yet.
+          </td>
+        </tr>
+      );
+    return containers.map((c) => (
+      <tr key={c.uid}>
+        <td className="fw-semibold">{c.name}</td>
+        <td>{c.institution ?? '—'}</td>
+        <td className="text-end">
+          {c.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td>{c.currentAsOfDate}</td>
+        <td className="d-flex gap-2">
+          <RenderDefaultButton label="Holdings" onClick={() => setHoldingsFor(c)} />
+          <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(c)} />
+        </td>
+      </tr>
+    ));
+  };
+
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Institution</th>
+          <th className="text-end">Current Value</th>
+          <th>As Of</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+    </Table>
+  );
+
   return (
     <div className="mb-4">
       <div className="d-flex justify-content-between align-items-center mb-2">
         <h4 className="mb-0">Brokerage / investment containers</h4>
         <RenderPrimaryButton label="New container" onClick={startCreate} />
       </div>
-      {isLoading ? (
-        <p>Loading...</p>
-      ) : containers.length === 0 ? (
-        <p className="text-muted">No containers yet.</p>
-      ) : (
-        <Table hover responsive>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Institution</th>
-              <th className="text-end">Current Value</th>
-              <th>As Of</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {containers.map((c) => (
-              <tr key={c.uid}>
-                <td className="fw-semibold">{c.name}</td>
-                <td>{c.institution ?? '—'}</td>
-                <td className="text-end">{c.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                <td>{c.currentAsOfDate}</td>
-                <td className="d-flex gap-2">
-                  <RenderDefaultButton label="Holdings" onClick={() => setHoldingsFor(c)} />
-                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(c)} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
       {renderModal()}
       <HoldingsModal
         containerUid={holdingsFor?.uid ?? null}

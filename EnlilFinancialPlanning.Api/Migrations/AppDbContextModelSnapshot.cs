@@ -217,6 +217,10 @@ namespace EnlilFinancialPlanning.Api.Migrations
                     b.Property<Guid>("LinkedEntityUID")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Tag")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.HasKey("UID");
 
                     b.HasIndex("LineItemUID");
@@ -683,6 +687,11 @@ namespace EnlilFinancialPlanning.Api.Migrations
 
                     b.Property<int>("Direction")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsCashMovement")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
 
                     b.Property<Guid?>("SourceTemplateUID")
                         .HasColumnType("uniqueidentifier");

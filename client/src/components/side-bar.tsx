@@ -5,6 +5,7 @@ interface NavItemSpec {
   label: string;
   icon: string;
   end?: boolean;
+  children?: NavItemSpec[];
 }
 
 interface NavSectionSpec {
@@ -20,7 +21,15 @@ const sections: NavSectionSpec[] = [
   {
     title: 'Cash Flow',
     items: [
-      { to: '/ledger', label: 'Ledger', icon: 'bi-journal-text' },
+      {
+        to: '/ledger',
+        label: 'Ledger',
+        icon: 'bi-journal-text',
+        end: true,
+        children: [
+          { to: '/ledger/reports', label: 'Reports', icon: 'bi-bar-chart' },
+        ],
+      },
       { to: '/templates', label: 'Recurring', icon: 'bi-arrow-repeat' },
       { to: '/categories', label: 'Categories', icon: 'bi-tags' },
     ],
@@ -36,19 +45,38 @@ const sections: NavSectionSpec[] = [
 ];
 
 export default function SideBar() {
+  const renderLink = (item: NavItemSpec, isChild: boolean) => (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      className={({ isActive }) =>
+        [
+          'sidebar-link',
+          isChild ? 'sidebar-link-child' : '',
+          isActive ? 'sidebar-link-active' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+      }
+      title={item.label}
+    >
+      <i className={`bi ${item.icon} sidebar-icon`} aria-hidden="true" />
+      <span className="sidebar-label">{item.label}</span>
+    </NavLink>
+  );
+
   const renderItem = (item: NavItemSpec) => (
     <li key={item.to} className="sidebar-item">
-      <NavLink
-        to={item.to}
-        end={item.end}
-        className={({ isActive }) =>
-          isActive ? 'sidebar-link sidebar-link-active' : 'sidebar-link'
-        }
-        title={item.label}
-      >
-        <i className={`bi ${item.icon} sidebar-icon`} aria-hidden="true" />
-        <span className="sidebar-label">{item.label}</span>
-      </NavLink>
+      {renderLink(item, false)}
+      {item.children && item.children.length > 0 && (
+        <ul className="sidebar-list sidebar-sublist">
+          {item.children.map((c) => (
+            <li key={c.to} className="sidebar-item">
+              {renderLink(c, true)}
+            </li>
+          ))}
+        </ul>
+      )}
     </li>
   );
 

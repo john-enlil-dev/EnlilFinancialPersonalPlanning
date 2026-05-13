@@ -17,4 +17,9 @@ public sealed class LineItem
     public RecurringTemplate? SourceTemplate { get; set; }
 
     public bool WasManuallyEdited { get; set; }
+
+    // False for LineItems that represent savings-internal events (Interest, Fee,
+    // Transfer) which must NOT affect the cash ledger. True for everything else,
+    // including savings Deposits/Withdrawals (which DO move cash).
+    public bool IsCashMovement { get; set; } = true;
 }

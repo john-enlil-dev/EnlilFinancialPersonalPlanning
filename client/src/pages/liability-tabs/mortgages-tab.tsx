@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Badge,
+  Card,
+  CardBody,
   Form,
   FormGroup,
   Input,
@@ -221,57 +223,79 @@ export default function MortgagesTab() {
     );
   };
 
+  const renderTableContent = () => {
+    if (isLoading)
+      return (
+        <tr>
+          <td colSpan={9} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
+    if (mortgages.length === 0)
+      return (
+        <tr>
+          <td colSpan={9} className="text-center text-muted py-3">
+            No mortgages yet.
+          </td>
+        </tr>
+      );
+    return mortgages.map((m) => (
+      <tr key={m.uid}>
+        <td className="fw-semibold">
+          <Link to={`/liabilities/mortgages/${m.uid}`} className="enlil-row-link">
+            {m.name}
+          </Link>
+        </td>
+        <td>{m.institution ?? '—'}</td>
+        <td>
+          <Badge color="info" pill>
+            {LOAN_TYPE_LABELS[m.loanType]}
+          </Badge>
+        </td>
+        <td className="text-end">{(m.interestRate * 100).toFixed(3)}%</td>
+        <td className="text-end">{m.termMonths} mo</td>
+        <td className="text-end">
+          {m.monthlyPaymentPI.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td className="text-end">
+          {m.currentBalance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td>{m.currentAsOfDate}</td>
+        <td>
+          <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(m)} />
+        </td>
+      </tr>
+    ));
+  };
+
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Institution</th>
+          <th>Type</th>
+          <th className="text-end">Rate</th>
+          <th className="text-end">Term</th>
+          <th className="text-end">P&amp;I</th>
+          <th className="text-end">Balance</th>
+          <th>As Of</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+    </Table>
+  );
+
   return (
     <div>
       <div className="d-flex justify-content-end mb-3">
         <RenderPrimaryButton label="New mortgage" onClick={startCreate} />
       </div>
-      {isLoading ? (
-        <p>Loading...</p>
-      ) : mortgages.length === 0 ? (
-        <p className="text-muted">No mortgages yet.</p>
-      ) : (
-        <Table hover responsive>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Institution</th>
-              <th>Type</th>
-              <th className="text-end">Rate</th>
-              <th className="text-end">Term</th>
-              <th className="text-end">P&amp;I</th>
-              <th className="text-end">Balance</th>
-              <th>As Of</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {mortgages.map((m) => (
-              <tr key={m.uid}>
-                <td className="fw-semibold">
-                  <Link to={`/liabilities/mortgages/${m.uid}`} className="enlil-row-link">
-                    {m.name}
-                  </Link>
-                </td>
-                <td>{m.institution ?? '—'}</td>
-                <td>
-                  <Badge color="info" pill>
-                    {LOAN_TYPE_LABELS[m.loanType]}
-                  </Badge>
-                </td>
-                <td className="text-end">{(m.interestRate * 100).toFixed(3)}%</td>
-                <td className="text-end">{m.termMonths} mo</td>
-                <td className="text-end">{m.monthlyPaymentPI.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                <td className="text-end">{m.currentBalance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                <td>{m.currentAsOfDate}</td>
-                <td>
-                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(m)} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
       {renderModal()}
     </div>
   );

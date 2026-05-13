@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
   Badge,
+  Card,
+  CardBody,
   Form,
   FormGroup,
   Input,
@@ -146,48 +148,68 @@ export default function RetirementTab() {
     );
   };
 
+  const renderTableContent = () => {
+    if (isLoading)
+      return (
+        <tr>
+          <td colSpan={6} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
+    if (containers.length === 0)
+      return (
+        <tr>
+          <td colSpan={6} className="text-center text-muted py-3">
+            No retirement accounts yet.
+          </td>
+        </tr>
+      );
+    return containers.map((c) => (
+      <tr key={c.uid}>
+        <td className="fw-semibold">{c.name}</td>
+        <td>{c.institution ?? '—'}</td>
+        <td>
+          <Badge color="info" pill>
+            {ACCOUNT_TYPE_LABELS[c.accountType]}
+          </Badge>
+        </td>
+        <td className="text-end">
+          {c.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td>{c.currentAsOfDate}</td>
+        <td className="d-flex gap-2">
+          <RenderDefaultButton label="Holdings" onClick={() => setHoldingsFor(c)} />
+          <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(c)} />
+        </td>
+      </tr>
+    ));
+  };
+
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Institution</th>
+          <th>Type</th>
+          <th className="text-end">Current Value</th>
+          <th>As Of</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+    </Table>
+  );
+
   return (
     <div>
       <div className="d-flex justify-content-end mb-3">
         <RenderPrimaryButton label="New retirement account" onClick={startCreate} />
       </div>
-      {isLoading ? (
-        <p>Loading...</p>
-      ) : containers.length === 0 ? (
-        <p className="text-muted">No retirement accounts yet.</p>
-      ) : (
-        <Table hover responsive>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Institution</th>
-              <th>Type</th>
-              <th className="text-end">Current Value</th>
-              <th>As Of</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {containers.map((c) => (
-              <tr key={c.uid}>
-                <td className="fw-semibold">{c.name}</td>
-                <td>{c.institution ?? '—'}</td>
-                <td>
-                  <Badge color="info" pill>
-                    {ACCOUNT_TYPE_LABELS[c.accountType]}
-                  </Badge>
-                </td>
-                <td className="text-end">{c.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                <td>{c.currentAsOfDate}</td>
-                <td className="d-flex gap-2">
-                  <RenderDefaultButton label="Holdings" onClick={() => setHoldingsFor(c)} />
-                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(c)} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
       {renderModal()}
       <RetirementHoldingsModal
         containerUid={holdingsFor?.uid ?? null}

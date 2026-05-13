@@ -35,9 +35,13 @@ export const queryKeys = {
   },
   savings: {
     all: ['savings'] as const,
+    detail: (uid: string) => ['savings', uid] as const,
+    transactions: (uid: string) => ['savings', uid, 'transactions'] as const,
   },
   creditCardDebts: {
     all: ['credit-card-debts'] as const,
+    detail: (uid: string) => ['credit-card-debts', uid] as const,
+    transactions: (uid: string) => ['credit-card-debts', uid, 'transactions'] as const,
   },
   mortgageDebts: {
     all: ['mortgage-debts'] as const,
@@ -48,5 +52,15 @@ export const queryKeys = {
   lineItemAllocations: {
     all: ['line-item-allocations'] as const,
     byLineItem: (lineItemUid: string) => ['line-item-allocations', { lineItemUid }] as const,
+  },
+  dashboard: {
+    all: ['dashboard'] as const,
+    tiles: () => ['dashboard', 'tiles'] as const,
+    timeline: () => ['dashboard', 'timeline'] as const,
+    categoryVariance: () => ['dashboard', 'category-variance'] as const,
+  },
+  ledgerReports: {
+    all: ['ledger-reports'] as const,
+    range: (from: string, to: string) => ['ledger-reports', { from, to }] as const,
   },
 };

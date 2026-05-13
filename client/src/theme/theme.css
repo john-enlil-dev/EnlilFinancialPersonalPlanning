@@ -165,6 +165,25 @@ body {
   display: inline-block;
   text-align: center;
 }
+
+/* Sub-link rows nested under a parent nav item. Hidden by default (when the
+   rail is collapsed) and revealed alongside labels when the sidebar expands on
+   hover/focus. Indented + slightly smaller so children read as subordinate. */
+.sidebar-sublist {
+  display: none;
+}
+.app-sidebar:hover .sidebar-sublist,
+.app-sidebar:focus-within .sidebar-sublist {
+  display: block;
+}
+.sidebar-link-child {
+  padding-left: 2.6rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+.sidebar-link-child .sidebar-icon {
+  font-size: 0.95rem;
+}
 .sidebar-label {
   white-space: nowrap;
   opacity: 0;
@@ -387,13 +406,16 @@ body {
   border-radius: 4px;
 }
 
-/* Year-card breakdown — three equal-width "table" columns inside each year
-   card so Principal / Interest / Escrow align across stacked cards. */
+/* Year-card breakdown — three columns × three rows so labels, values, and the
+   optional extra-principal note each sit on their own row. Values align
+   horizontally regardless of whether the Principal column also has an extra
+   note beneath it. */
 .year-card-breakdown {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.25rem 0.75rem;
-  align-items: end;
+  grid-template-rows: auto auto auto;
+  column-gap: 0.75rem;
+  row-gap: 0.15rem;
 }
 .year-card-breakdown .year-cell-label {
   font-size: 0.65rem;
@@ -401,20 +423,19 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.55);
-  display: block;
   line-height: 1;
-  margin-bottom: 0.2rem;
 }
 .year-card-breakdown .year-cell-value {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 .year-card-breakdown .year-cell-extra {
   font-size: 0.7rem;
   font-style: italic;
   color: rgba(255, 255, 255, 0.5);
-  display: block;
   line-height: 1.1;
+  min-height: 0.9rem; /* reserves the row even when the cell is empty */
 }
 /* Stat-card subtitles — italic + lighter so they read as supporting commentary
    rather than another label. */
@@ -447,13 +468,51 @@ body {
   overflow: hidden;
 }
 
-.dashboard-card {
-  border-left: 3px solid var(--enlil-accent);
-  transition: transform 0.15s ease, border-left-color 0.15s ease;
+/* Dashboard tile row — 4 KPIs across the top of the dashboard. */
+.dashboard-tile-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
 }
-.dashboard-card:hover {
-  transform: translateY(-2px);
-  border-left-color: var(--enlil-accent-bright);
+@media (max-width: 992px) {
+  .dashboard-tile-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.dashboard-tile {
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--enlil-accent);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.dashboard-tile-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+.dashboard-tile-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.dashboard-tile-baseline {
+  font-size: 0.82rem;
+}
+
+/* Chart hover tooltip — opaque card with the per-week breakdown. */
+.dashboard-chart-tooltip {
+  background-color: var(--enlil-surface-elevated);
+  border: 1px solid var(--enlil-card-border);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.dashboard-chart-tooltip-title {
+  font-weight: 700;
+  margin-bottom: 0.35rem;
 }
 
 /* Tables — give the header row real weight and tighten spacing. */

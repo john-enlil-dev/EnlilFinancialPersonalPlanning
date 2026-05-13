@@ -36,6 +36,12 @@ builder.Services.AddScoped<LineItemAllocationManager>();
 builder.Services.AddScoped<IMortgageAmortizationService, MortgageAmortizationService>();
 builder.Services.AddScoped<IBalanceAffectService, BalanceAffectService>();
 
+builder.Services.AddScoped<EnlilFinancialPlanning.Api.Services.Dashboard.DashboardTilesService>();
+builder.Services.AddScoped<EnlilFinancialPlanning.Api.Services.Dashboard.DashboardTimelineService>();
+builder.Services.AddScoped<EnlilFinancialPlanning.Api.Services.Dashboard.DashboardCategoryVarianceService>();
+
+builder.Services.AddScoped<EnlilFinancialPlanning.Api.Services.LedgerReports.LedgerReportService>();
+
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddFluentValidationAutoValidation();
 

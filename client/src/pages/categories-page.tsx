@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
   Badge,
+  Card,
+  CardBody,
   Container,
   Form,
   FormGroup,
@@ -15,6 +17,8 @@ import {
 } from 'reactstrap';
 import { categoriesApi } from '../api/categories';
 import { queryKeys } from '../api/query-keys';
+import { CategoryPill } from '../UI/functions/render-category-pill';
+import { RenderPageHeader } from '../UI/functions/render-page-header';
 import {
   RenderDefaultButton,
   RenderPrimaryButton,
@@ -185,10 +189,9 @@ export default function CategoriesPage() {
     );
   };
 
-  const renderHeader = () => (
-    <div className="d-flex align-items-center mb-3">
-      <h1 className="me-auto mb-0">Categories</h1>
-      <FormGroup check className="me-3 mb-0">
+  const renderHeaderRight = () => (
+    <>
+      <FormGroup check className="mb-0">
         <Input
           id="includeArchived"
           type="checkbox"
@@ -199,69 +202,102 @@ export default function CategoriesPage() {
           Show archived
         </Label>
       </FormGroup>
-      <RenderPrimaryButton label="New category" onClick={startCreate} />
-    </div>
+      <RenderPrimaryButton label="New category" icon="bi-plus-lg" onClick={startCreate} />
+    </>
   );
 
-  const renderTable = () => {
-    if (isLoading) return <p>Loading...</p>;
-    if (error) return <p className="text-danger">{error instanceof Error ? error.message : 'Failed to load categories'}</p>;
-    if (categories.length === 0) return <p className="text-muted">No categories yet.</p>;
+  const renderHeader = () => (
+    <RenderPageHeader
+      title="Categories"
+      subtitle="Income / expense / both buckets used by line items and templates."
+      rightContent={renderHeaderRight()}
+    />
+  );
 
-    return (
-      <Table hover responsive>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Direction</th>
-            <th>Description</th>
-            <th>Status</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {categories.map((c) => {
-            const directionColor =
-              c.direction === CategoryDirection.Income
-                ? 'success'
-                : c.direction === CategoryDirection.Expense
-                  ? 'danger'
-                  : 'info';
-            return (
-              <tr key={c.uid}>
-                <td className="fw-semibold">{c.name}</td>
-                <td>
-                  <Badge color={directionColor} pill>
-                    {CATEGORY_DIRECTION_LABELS[c.direction]}
-                  </Badge>
-                </td>
-                <td>{c.description ?? '—'}</td>
-                <td>
-                  {c.isArchived ? (
-                    <Badge color="secondary" pill>
-                      Archived
-                    </Badge>
-                  ) : (
-                    <Badge color="success" pill>
-                      Active
-                    </Badge>
-                  )}
-                </td>
-                <td>
-                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(c)} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </Table>
-    );
+  const renderTableContent = () => {
+    if (isLoading)
+      return (
+        <tr>
+          <td colSpan={5} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
+    if (error)
+      return (
+        <tr>
+          <td colSpan={5} className="text-center text-danger py-3">
+            {error instanceof Error ? error.message : 'Failed to load categories'}
+          </td>
+        </tr>
+      );
+    if (categories.length === 0)
+      return (
+        <tr>
+          <td colSpan={5} className="text-center text-muted py-3">
+            No categories yet.
+          </td>
+        </tr>
+      );
+
+    return categories.map((c) => {
+      const directionColor =
+        c.direction === CategoryDirection.Income
+          ? 'success'
+          : c.direction === CategoryDirection.Expense
+            ? 'danger'
+            : 'info';
+      return (
+        <tr key={c.uid}>
+          <td>
+            <CategoryPill categoryUid={c.uid} name={c.name} />
+          </td>
+          <td>
+            <Badge color={directionColor} pill>
+              {CATEGORY_DIRECTION_LABELS[c.direction]}
+            </Badge>
+          </td>
+          <td>{c.description ?? '—'}</td>
+          <td>
+            {c.isArchived ? (
+              <Badge color="secondary" pill>
+                Archived
+              </Badge>
+            ) : (
+              <Badge color="success" pill>
+                Active
+              </Badge>
+            )}
+          </td>
+          <td>
+            <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(c)} />
+          </td>
+        </tr>
+      );
+    });
   };
 
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Direction</th>
+          <th>Description</th>
+          <th>Status</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+    </Table>
+  );
+
   return (
-    <Container className="py-4">
+    <Container fluid className="py-4">
       {renderHeader()}
-      {renderTable()}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
       {renderModal()}
     </Container>
   );

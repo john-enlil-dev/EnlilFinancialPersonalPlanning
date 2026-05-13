@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  Card,
+  CardBody,
   Form,
   FormGroup,
   Input,
@@ -166,47 +169,75 @@ export default function CreditCardsTab() {
     );
   };
 
+  const renderTableContent = () => {
+    if (isLoading)
+      return (
+        <tr>
+          <td colSpan={8} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
+    if (cards.length === 0)
+      return (
+        <tr>
+          <td colSpan={8} className="text-center text-muted py-3">
+            No credit cards yet.
+          </td>
+        </tr>
+      );
+    return cards.map((c) => (
+      <tr key={c.uid}>
+        <td className="fw-semibold">
+          <Link to={`/liabilities/credit-cards/${c.uid}`} className="enlil-row-link">
+            {c.name}
+          </Link>
+        </td>
+        <td>{c.institution ?? '—'}</td>
+        <td className="text-end">{(c.apr * 100).toFixed(2)}%</td>
+        <td className="text-end">
+          {c.creditLimit.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td className="text-end">
+          {c.minimumPayment.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td className="text-end">
+          {c.currentBalance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td>{c.currentAsOfDate}</td>
+        <td>
+          <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(c)} />
+        </td>
+      </tr>
+    ));
+  };
+
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Institution</th>
+          <th className="text-end">APR</th>
+          <th className="text-end">Limit</th>
+          <th className="text-end">Min Payment</th>
+          <th className="text-end">Balance</th>
+          <th>As Of</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+    </Table>
+  );
+
   return (
     <div>
       <div className="d-flex justify-content-end mb-3">
         <RenderPrimaryButton label="New credit card" onClick={startCreate} />
       </div>
-      {isLoading ? (
-        <p>Loading...</p>
-      ) : cards.length === 0 ? (
-        <p className="text-muted">No credit cards yet.</p>
-      ) : (
-        <Table hover responsive>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Institution</th>
-              <th className="text-end">APR</th>
-              <th className="text-end">Limit</th>
-              <th className="text-end">Min Payment</th>
-              <th className="text-end">Balance</th>
-              <th>As Of</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {cards.map((c) => (
-              <tr key={c.uid}>
-                <td className="fw-semibold">{c.name}</td>
-                <td>{c.institution ?? '—'}</td>
-                <td className="text-end">{(c.apr * 100).toFixed(2)}%</td>
-                <td className="text-end">{c.creditLimit.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                <td className="text-end">{c.minimumPayment.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                <td className="text-end">{c.currentBalance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                <td>{c.currentAsOfDate}</td>
-                <td>
-                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(c)} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
       {renderModal()}
     </div>
   );

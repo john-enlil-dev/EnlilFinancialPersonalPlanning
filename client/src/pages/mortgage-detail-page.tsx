@@ -467,30 +467,29 @@ export default function MortgageDetailPage() {
                 <CardBody className="py-2">
                   <div className="d-flex justify-content-between align-items-baseline mb-2">
                     <span className="stat-card-label">{row.year}</span>
-                    <strong className="fs-5">{fmt(row.Total)}</strong>
+                    <strong style={{ fontSize: '1.05rem' }}>{fmt(row.Total)}</strong>
                   </div>
                   <div className="year-card-breakdown">
-                    <div>
-                      <span className="year-cell-label">Principal</span>
-                      <span className="year-cell-value" style={{ color: COMPONENT_COLORS.Principal }}>
-                        {fmt(totalPrincipal)}
-                      </span>
-                      {row['Extra Principal'] > 0 && (
-                        <span className="year-cell-extra">+{fmt(row['Extra Principal'])} extra</span>
-                      )}
-                    </div>
-                    <div>
-                      <span className="year-cell-label">Interest</span>
-                      <span className="year-cell-value" style={{ color: COMPONENT_COLORS.Interest }}>
-                        {fmt(row.Interest)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="year-cell-label">Escrow</span>
-                      <span className="year-cell-value" style={{ color: COMPONENT_COLORS.Escrow }}>
-                        {fmt(row.Escrow)}
-                      </span>
-                    </div>
+                    {/* Row 1 — labels */}
+                    <span className="year-cell-label">Principal</span>
+                    <span className="year-cell-label">Interest</span>
+                    <span className="year-cell-label">Escrow</span>
+                    {/* Row 2 — values (always at the same vertical position) */}
+                    <span className="year-cell-value" style={{ color: COMPONENT_COLORS.Principal }}>
+                      {fmt(totalPrincipal)}
+                    </span>
+                    <span className="year-cell-value" style={{ color: COMPONENT_COLORS.Interest }}>
+                      {fmt(row.Interest)}
+                    </span>
+                    <span className="year-cell-value" style={{ color: COMPONENT_COLORS.Escrow }}>
+                      {fmt(row.Escrow)}
+                    </span>
+                    {/* Row 3 — extra-principal note only under the Principal column */}
+                    <span className="year-cell-extra">
+                      {row['Extra Principal'] > 0 ? `+${fmt(row['Extra Principal'])} extra` : ''}
+                    </span>
+                    <span className="year-cell-extra" />
+                    <span className="year-cell-extra" />
                   </div>
                 </CardBody>
               </Card>
@@ -502,46 +501,52 @@ export default function MortgageDetailPage() {
     );
   };
 
-  // Derived principal-balance trajectory, bucketed by month so the timeline lines
-  // up with the monthly-payments bar chart. Anchor at (currentAsOfDate, currentBalance)
-  // then walk newest→oldest, adding back each payment's principal+extra-principal so
-  // we recover what the balance was at every prior payment date. For each month, take
-  // the LAST balance recorded in that month. Months with no payments stay undefined
-  // so Recharts renders them as blanks (gaps) on the line.
+  // Derived principal-balance trajectory, bucketed by BILLING MONTH (matching
+  // the monthly-payments bar chart) so the two timelines line up. Walk back
+  // newest→oldest by payment date, adding each payment's principal+extra to
+  // recover what the balance was at every prior point. Then key the resulting
+  // balances by billing month (falling back to payment date when unset).
+  // First-encounter wins per month — since we walk newest-first, that's the
+  // latest payment in each month, i.e., the end-of-month balance.
   const balanceTrajectory = useMemo(() => {
     if (!mortgage) return [];
     const validPayments = payments.filter((p) => p.date <= mortgage.currentAsOfDate);
     const sortedDesc = [...validPayments].sort((a, b) => b.date.localeCompare(a.date));
 
-    // Walk back, recording (date → balance just after that point).
-    const balanceAtDate = new Map<string, number>();
+    const balanceByMonth = new Map<string, number>();
     let runningBalance = mortgage.currentBalance;
-    balanceAtDate.set(mortgage.currentAsOfDate, runningBalance);
+    // Anchor: the as-of month carries currentBalance unless a payment in the
+    // same month overrides it (we keep first-write-wins semantics below).
+    balanceByMonth.set(mortgage.currentAsOfDate.slice(0, 7), runningBalance);
+
     for (const p of sortedDesc) {
       const principalSum = p.allocations.reduce((sum, a) => {
         const bucket = bucketComponent(a.componentType);
         return bucket === 'Principal' || bucket === 'Extra Principal' ? sum + a.amount : sum;
       }, 0);
-      balanceAtDate.set(p.date, runningBalance);
+      const bucketMonth = (p.billingMonth ?? p.date).slice(0, 7);
+      // First-encounter wins: walking newest→oldest, the first payment hit in
+      // each billing month is the most recent in that month — its balance-after
+      // is the end-of-month balance.
+      if (!balanceByMonth.has(bucketMonth)) {
+        balanceByMonth.set(bucketMonth, runningBalance);
+      }
       runningBalance += principalSum;
     }
 
-    // Bucket by month — last balance recorded in each calendar month wins.
-    const balanceByMonth = new Map<string, number>();
-    const sortedDates = [...balanceAtDate.keys()].sort();
-    for (const date of sortedDates) {
-      balanceByMonth.set(date.slice(0, 7), balanceAtDate.get(date)!);
-    }
     if (balanceByMonth.size === 0) return [];
 
     const sortedMonths = [...balanceByMonth.keys()].sort();
     const allMonths = generateMonthRange(sortedMonths[0]!, sortedMonths[sortedMonths.length - 1]!);
-    return allMonths.map((month) => ({
-      month,
-      // undefined for months with no recorded balance — Recharts breaks the line
-      // at undefined values, giving the visual "blank" the user asked for.
-      balance: balanceByMonth.get(month),
-    }));
+    // Forward-fill: a month with no payment doesn't change the balance, so the
+    // line carries the previous balance forward. Handles "paid a month ahead but
+    // skipped this month" cleanly — the line stays flat instead of breaking.
+    let lastBalance: number | undefined;
+    return allMonths.map((month) => {
+      const recorded = balanceByMonth.get(month);
+      if (recorded !== undefined) lastBalance = recorded;
+      return { month, balance: lastBalance };
+    });
   }, [mortgage, payments]);
 
   const renderBalanceChart = () => {
@@ -845,8 +850,8 @@ export default function MortgageDetailPage() {
         <TabPane tabId="overview" className="overview-pane">
           {activeTab === 'overview' && (
             <Row className="g-3">
-              <Col xl={5}>{renderYearlyCards()}</Col>
-              <Col xl={7}>
+              <Col xl={4}>{renderYearlyCards()}</Col>
+              <Col xl={8}>
                 {renderBalanceChart()}
                 {renderChart()}
               </Col>

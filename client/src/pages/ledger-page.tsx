@@ -20,15 +20,18 @@ import {
 import { categoriesApi } from '../api/categories';
 import { lineItemsApi } from '../api/line-items';
 import { queryKeys } from '../api/query-keys';
+import { CategoryPill } from '../UI/functions/render-category-pill';
 import { RenderMultiSelect } from '../UI/functions/render-multi-select';
 import { RenderPageHeader } from '../UI/functions/render-page-header';
 import {
+  RenderDangerButton,
   RenderDefaultButton,
   RenderPrimaryButton,
 } from '../UI/functions/render-skeleton-button-functions';
 import type {
   CreateLineItemRequest,
   LineItem,
+  LineItemLinkage,
   LineItemQuery,
   UpdateLineItemRequest,
 } from '../types/api';
@@ -78,6 +81,12 @@ export default function LedgerPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<FormState>(blankForm());
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const [deletingItem, setDeletingItem] = useState<LineItem | null>(null);
+  const [linkages, setLinkages] = useState<LineItemLinkage[] | null>(null);
+  const [linkagesError, setLinkagesError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [loadingLinkages, setLoadingLinkages] = useState(false);
 
   type FilterKey = 'date' | 'direction' | 'category';
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
@@ -147,6 +156,47 @@ export default function LedgerPage() {
     },
     onError: (e) => setSubmitError(e instanceof Error ? e.message : 'Save failed'),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (uid: string) => lineItemsApi.delete(uid),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lineItems.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.savings.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.creditCardDebts.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mortgageDebts.all });
+      closeDelete();
+    },
+    onError: (e) => setDeleteError(e instanceof Error ? e.message : 'Delete failed'),
+  });
+
+  const startDelete = async (li: LineItem) => {
+    setDeletingItem(li);
+    setLinkages(null);
+    setLinkagesError(null);
+    setDeleteError(null);
+    setLoadingLinkages(true);
+    try {
+      const links = await lineItemsApi.getLinkages(li.uid);
+      setLinkages(links);
+    } catch (e) {
+      setLinkagesError(e instanceof Error ? e.message : 'Failed to load linkages');
+    } finally {
+      setLoadingLinkages(false);
+    }
+  };
+
+  const closeDelete = () => {
+    setDeletingItem(null);
+    setLinkages(null);
+    setLinkagesError(null);
+    setDeleteError(null);
+    setLoadingLinkages(false);
+  };
+
+  const confirmDelete = () => {
+    if (deletingItem) deleteMutation.mutate(deletingItem.uid);
+  };
 
   const eligibleCategories = useMemo(() => {
     return categories.filter((c) => {
@@ -471,7 +521,9 @@ export default function LedgerPage() {
             {isIncome ? '+' : '−'}
             {li.amount.toFixed(2)}
           </td>
-          <td>{li.categoryName}</td>
+          <td>
+            <CategoryPill categoryUid={li.categoryUID} name={li.categoryName} />
+          </td>
           <td>{li.description ?? '—'}</td>
           <td>
             {li.sourceTemplateName ? (
@@ -488,11 +540,70 @@ export default function LedgerPage() {
             )}
           </td>
           <td>
-            <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(li)} />
+            <div className="d-flex gap-2">
+              <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(li)} />
+              <RenderDangerButton
+                label="Delete"
+                icon="bi-trash"
+                onClick={() => void startDelete(li)}
+              />
+            </div>
           </td>
         </tr>
       );
     });
+  };
+
+  const renderDeleteModal = () => {
+    const isOpen = deletingItem !== null;
+    const hasLinkages = linkages && linkages.length > 0;
+    const isDeleting = deleteMutation.isPending;
+    return (
+      <Modal isOpen={isOpen} toggle={closeDelete}>
+        <ModalHeader toggle={closeDelete}>Delete line item</ModalHeader>
+        <ModalBody>
+          {deletingItem && (
+            <p className="mb-3">
+              Delete <strong>{deletingItem.categoryName}</strong> on{' '}
+              <strong>{deletingItem.date}</strong> for{' '}
+              <strong>${deletingItem.amount.toFixed(2)}</strong>?
+            </p>
+          )}
+          {loadingLinkages && <p className="text-muted mb-0">Checking for linked records…</p>}
+          {linkagesError && <p className="text-danger mb-0">{linkagesError}</p>}
+          {!loadingLinkages && hasLinkages && (
+            <div className="mb-0">
+              <p className="mb-2">
+                This line item is also linked to the following — deleting will remove it from
+                those views too:
+              </p>
+              <ul className="mb-0">
+                {linkages!.map((l, i) => (
+                  <li key={i}>
+                    {l.entityType}: <strong>{l.entityName}</strong>
+                    {l.componentType ? ` — ${l.componentType}` : ''} ($
+                    {l.amount.toFixed(2)})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {!loadingLinkages && linkages && linkages.length === 0 && (
+            <p className="text-muted mb-0">No other records are linked to this line item.</p>
+          )}
+          {deleteError && <p className="text-danger mt-2 mb-0">{deleteError}</p>}
+        </ModalBody>
+        <ModalFooter>
+          <RenderDefaultButton label="Cancel" onClick={closeDelete} disabled={isDeleting} />
+          <RenderDangerButton
+            label="Delete"
+            icon="bi-trash"
+            onClick={confirmDelete}
+            disabled={isDeleting || loadingLinkages}
+          />
+        </ModalFooter>
+      </Modal>
+    );
   };
 
   const renderTable = () => (
@@ -543,6 +654,7 @@ export default function LedgerPage() {
       {renderDirectionPopover()}
       {renderCategoryPopover()}
       {renderModal()}
+      {renderDeleteModal()}
     </Container>
   );
 }

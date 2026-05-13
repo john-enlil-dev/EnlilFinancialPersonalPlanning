@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
+  Card,
+  CardBody,
   Form,
   FormGroup,
   Input,
@@ -177,48 +179,68 @@ export default function SimpleAssetsTab() {
     </div>
   );
 
-  const renderTable = () => {
-    if (isLoading) return <p>Loading...</p>;
+  const renderTableContent = () => {
+    if (isLoading)
+      return (
+        <tr>
+          <td colSpan={5} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
     if (error)
       return (
-        <p className="text-danger">
-          {error instanceof Error ? error.message : 'Failed to load simple assets'}
-        </p>
+        <tr>
+          <td colSpan={5} className="text-center text-danger py-3">
+            {error instanceof Error ? error.message : 'Failed to load simple assets'}
+          </td>
+        </tr>
       );
-    if (assets.length === 0) return <p className="text-muted">No simple assets yet.</p>;
+    if (assets.length === 0)
+      return (
+        <tr>
+          <td colSpan={5} className="text-center text-muted py-3">
+            No simple assets yet.
+          </td>
+        </tr>
+      );
 
-    return (
-      <Table hover responsive>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Subtype</th>
-            <th className="text-end">Current Value</th>
-            <th>As Of</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {assets.map((a) => (
-            <tr key={a.uid}>
-              <td className="fw-semibold">{a.name}</td>
-              <td>{a.subtype ?? '—'}</td>
-              <td className="text-end">{a.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-              <td>{a.currentAsOfDate}</td>
-              <td>
-                <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(a)} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-    );
+    return assets.map((a) => (
+      <tr key={a.uid}>
+        <td className="fw-semibold">{a.name}</td>
+        <td>{a.subtype ?? '—'}</td>
+        <td className="text-end">
+          {a.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td>{a.currentAsOfDate}</td>
+        <td>
+          <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(a)} />
+        </td>
+      </tr>
+    ));
   };
+
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Subtype</th>
+          <th className="text-end">Current Value</th>
+          <th>As Of</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+    </Table>
+  );
 
   return (
     <div>
       {renderToolbar()}
-      {renderTable()}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
       {renderModal()}
     </div>
   );

@@ -16,6 +16,7 @@ public sealed class LineItemAllocationConfiguration : IEntityTypeConfiguration<L
         builder.Property(x => x.LinkedEntityType).HasConversion<int>();
         builder.Property(x => x.ComponentType).HasMaxLength(100);
         builder.Property(x => x.Amount).HasPrecision(18, 2);
+        builder.Property(x => x.Tag).HasMaxLength(100);
 
         builder.HasOne(x => x.LineItem)
             .WithMany()

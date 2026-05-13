@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
   Badge,
+  Card,
+  CardBody,
   Container,
   Form,
   FormGroup,
@@ -16,6 +18,8 @@ import {
 import { categoriesApi } from '../api/categories';
 import { queryKeys } from '../api/query-keys';
 import { recurringTemplatesApi } from '../api/recurring-templates';
+import { CategoryPill } from '../UI/functions/render-category-pill';
+import { RenderPageHeader } from '../UI/functions/render-page-header';
 import {
   RenderDefaultButton,
   RenderPrimaryButton,
@@ -503,72 +507,99 @@ export default function TemplatesPage() {
   };
 
   const renderHeader = () => (
-    <div className="d-flex align-items-center mb-3">
-      <h1 className="me-auto mb-0">Recurring templates</h1>
-      <RenderPrimaryButton label="New template" onClick={startCreate} />
-    </div>
+    <RenderPageHeader
+      title="Recurring templates"
+      subtitle="Schedule-driven items (rent, mortgage, paychecks) that seed line items into the ledger."
+      rightContent={
+        <RenderPrimaryButton label="New template" icon="bi-plus-lg" onClick={startCreate} />
+      }
+    />
   );
 
-  const renderTable = () => {
-    if (templatesQuery.isLoading) return <p>Loading...</p>;
+  const renderTableContent = () => {
+    if (templatesQuery.isLoading)
+      return (
+        <tr>
+          <td colSpan={8} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
     if (templatesQuery.error)
       return (
-        <p className="text-danger">
-          {templatesQuery.error instanceof Error
-            ? templatesQuery.error.message
-            : 'Failed to load templates'}
-        </p>
+        <tr>
+          <td colSpan={8} className="text-center text-danger py-3">
+            {templatesQuery.error instanceof Error
+              ? templatesQuery.error.message
+              : 'Failed to load templates'}
+          </td>
+        </tr>
       );
-    if (templates.length === 0) return <p className="text-muted">No recurring templates yet.</p>;
+    if (templates.length === 0)
+      return (
+        <tr>
+          <td colSpan={8} className="text-center text-muted py-3">
+            No recurring templates yet.
+          </td>
+        </tr>
+      );
 
-    return (
-      <Table hover responsive>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Direction</th>
-            <th className="text-end">Amount</th>
-            <th>Schedule</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Category</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {templates.map((t) => {
-            const isIncome = t.direction === Direction.Income;
-            return (
-              <tr key={t.uid}>
-                <td className="fw-semibold">{t.name}</td>
-                <td>
-                  <Badge color={isIncome ? 'success' : 'danger'} pill>
-                    {DIRECTION_LABELS[t.direction]}
-                  </Badge>
-                </td>
-                <td className={`text-end fw-semibold ${isIncome ? 'text-income' : 'text-expense'}`}>
-                  {isIncome ? '+' : '−'}
-                  {t.amount.toFixed(2)}
-                </td>
-                <td>{summarizeCadence(t)}</td>
-                <td>{t.startDate}</td>
-                <td>{t.endDate ?? '—'}</td>
-                <td>{t.categoryName}</td>
-                <td>
-                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(t)} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </Table>
-    );
+    return templates.map((t) => {
+      const isIncome = t.direction === Direction.Income;
+      return (
+        <tr key={t.uid}>
+          <td className="fw-semibold">{t.name}</td>
+          <td>
+            <Badge color={isIncome ? 'success' : 'danger'} pill>
+              {DIRECTION_LABELS[t.direction]}
+            </Badge>
+          </td>
+          <td className={`text-end fw-semibold ${isIncome ? 'text-income' : 'text-expense'}`}>
+            {isIncome ? '+' : '−'}
+            {t.amount.toFixed(2)}
+          </td>
+          <td>{summarizeCadence(t)}</td>
+          <td>{t.startDate}</td>
+          <td>{t.endDate ?? '—'}</td>
+          <td>
+            <CategoryPill categoryUid={t.categoryUID} name={t.categoryName} />
+          </td>
+          <td>
+            <RenderDefaultButton
+              label="Edit"
+              icon="bi-pencil-square"
+              onClick={() => startEdit(t)}
+            />
+          </td>
+        </tr>
+      );
+    });
   };
 
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Direction</th>
+          <th className="text-end">Amount</th>
+          <th>Schedule</th>
+          <th>Start</th>
+          <th>End</th>
+          <th>Category</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+    </Table>
+  );
+
   return (
-    <Container className="py-4">
+    <Container fluid className="py-4">
       {renderHeader()}
-      {renderTable()}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
       {renderModal()}
     </Container>
   );

@@ -79,6 +79,41 @@ _(none — initial design complete 2026-05-08, ready to scope into implementatio
 ### Open questions
 - _(none — ready to implement.)_
 
+## Savings transaction-history scope (added 2026-05-08)
+**Goal:** click into a Savings account to capture deposits, withdrawals, interest accruals over time. Each withdrawal carries a "why" so the user can read the timeline as a story — what was the balance at each point, what came in, what came out, and why.
+
+**Existing primitives to reuse:** same as mortgage — `LineItem` + `LineItemAllocation` already supports `LinkedEntityType.Savings`. Per-transaction `ComponentType` describes the transaction type; `Description` on the LineItem captures the "why".
+
+### Decisions
+- **UI shape: drill-in detail page at `/assets/savings/:uid`.** Confirmed by user 2026-05-08. Mirrors the mortgage detail-page pattern — Overview / Line Items tabs, summary header, year cards, charts, transaction history table, add-transaction modal.
+- **Transaction component types: `Deposit`, `Withdrawal`, `Interest`, `Fee`, `Transfer`.** Confirmed by user 2026-05-08. Stored in the existing `LineItemAllocation.ComponentType` string field.
+- **"Why" capture: `LineItem.Description`** (existing free-form field). No new schema for the description itself.
+- **New `Tag: string?` column on `LineItemAllocation`** (max 100). Confirmed by user 2026-05-08. Savings-specific grouping that's separate from the global Categories table. UI uses react-select Creatable with options derived from existing distinct `Tag` values — no DB lookup table for v1. Field is generic at the schema layer; its v1 use is savings transaction grouping (e.g., "Vacation", "Emergency fund", "Bonus") for future per-tag metrics.
+- **Direction auto-derived from `ComponentType`** — Deposit / Interest → `Income`; Withdrawal / Fee / Transfer → `Expense`. The user doesn't pick direction manually.
+- **Balance trajectory derived from `currentValue` + transaction history.** Same forward-walk pattern as the mortgage detail page; no manual `SavingsValueSnapshot` entry required for the chart.
+- **Each transaction is one LineItem with one LineItemAllocation** (single-component, not multi-component breakdown). Mortgage uses multi-component because each payment has 4-5 inherent pieces; savings transactions are atomic.
+- **Balance-affect deferred / not auto-applied** (same stance as mortgage). All allocations save with `AffectsLinkedBalance=false`. The user keeps `Savings.CurrentValue` accurate by editing the savings row directly.
+
+### Open questions
+- _(none — ready to implement.)_
+
+## Credit Card transaction-history scope (added 2026-05-08)
+**Goal:** parallel of the savings detail page for credit card debts. Click into a credit card to capture charges, payments, interest, fees, refunds. Read the timeline as a story — balance growth/shrinkage, what was charged, what was paid down, fee/interest impact.
+
+**Existing primitives to reuse:** `LineItem` + `LineItemAllocation` with `LinkedEntityType.CreditCardDebt`. `Tag` column already added.
+
+### Decisions
+- **UI shape: drill-in detail page at `/liabilities/credit-cards/:uid`.** Mirrors mortgage/savings.
+- **Transaction component types: `Charge`, `Payment`, `Interest`, `Fee`, `Refund`.** Stored in `LineItemAllocation.ComponentType`.
+- **Sign convention inverted from savings (this is debt):** `Charge / Interest / Fee` → balance up; `Payment / Refund` → balance down.
+- **Color convention also inverted:** net positive (debt grew) = red, net negative (debt paid down) = green.
+- **`LineItem.Direction` follows the picked category** (same as savings).
+- **Balance-affect deferred** — `AffectsLinkedBalance=false` on every allocation. User keeps `CreditCardDebt.CurrentBalance` accurate by editing the card directly.
+- **`TagPill` extracted to a shared component** (`UI/functions/render-tag-pill.tsx`) for reuse between savings and credit card pages.
+
+### Open questions
+- _(none — ready to implement.)_
+
 ## Out of scope (this iteration)
 - Multi-currency
 - Soft delete / audit history

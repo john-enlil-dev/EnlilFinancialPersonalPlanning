@@ -60,6 +60,13 @@ export interface LineItemQuery {
   categoryUIDs?: string[];
 }
 
+export interface LineItemLinkage {
+  entityType: string;
+  entityName: string;
+  componentType: string | null;
+  amount: number;
+}
+
 export interface RecurringTemplate {
   uid: string;
   name: string;
@@ -378,4 +385,147 @@ export interface MortgageBalanceSnapshot {
   uid: string;
   date: string;
   balance: number;
+}
+
+// Savings transactions — derived view of LineItem + LineItemAllocation linked
+// to a Savings account. One transaction = one allocation.
+export type SavingsComponentType = 'Deposit' | 'Withdrawal' | 'Interest' | 'Fee' | 'Transfer';
+
+export interface SavingsTransaction {
+  lineItemUID: string;
+  date: string;
+  billingMonth: string | null;
+  direction: Direction;
+  componentType: string | null;
+  amount: number;
+  tag: string | null;
+  description: string | null;
+  categoryUID: string;
+  categoryName: string;
+  allocationUID: string;
+}
+
+export interface CreateSavingsTransactionRequest {
+  date: string;
+  billingMonth: string | null;
+  categoryUID: string;
+  description: string | null;
+  componentType: SavingsComponentType;
+  amount: number;
+  tag: string | null;
+}
+
+export interface RepairLedgerPolarityReport {
+  dryRun: boolean;
+  totalScanned: number;
+  updated: number;
+  alreadyCorrect: number;
+  unknownComponentType: number;
+  updatedByComponentType: Record<string, number>;
+}
+
+// Dashboard
+export interface DashboardTile {
+  value: number;
+  baseline: number | null;
+}
+
+export interface DashboardTilesResponse {
+  incomeThisMonth: DashboardTile;
+  expenseThisMonth: DashboardTile;
+  netThisMonth: DashboardTile;
+  netNext30Days: DashboardTile;
+  hasEnoughHistoryForBaselines: boolean;
+}
+
+export interface TimelineWeek {
+  weekStart: string;
+  weekEnd: string;
+  income: number;
+  expense: number;
+  net: number;
+  runningBalance: number;
+}
+
+export interface DashboardTimelineResponse {
+  weeks: TimelineWeek[];
+  hasTemplates: boolean;
+}
+
+export interface CategoryVarianceRow {
+  categoryUID: string;
+  categoryName: string;
+  thisMonth: number;
+  baseline: number | null;
+  delta: number | null;
+  percentDelta: number | null;
+}
+
+export interface DashboardCategoryVarianceResponse {
+  rows: CategoryVarianceRow[];
+  hasEnoughHistoryForBaselines: boolean;
+}
+
+// Ledger Reports
+export interface LedgerReportCategorySlice {
+  categoryUID: string;
+  categoryName: string;
+  amount: number;
+  transactionCount: number;
+  priorAmount: number | null;
+}
+
+export interface LedgerReportMonthlyCategory {
+  categoryUID: string;
+  categoryName: string;
+  amount: number;
+}
+
+export interface LedgerReportMonthlyBucket {
+  monthStart: string;
+  categories: LedgerReportMonthlyCategory[];
+}
+
+export interface LedgerReportInsight {
+  kind: string;
+  message: string;
+}
+
+export interface LedgerReportResponse {
+  from: string;
+  to: string;
+  totalIncome: number;
+  totalExpense: number;
+  netCashflow: number;
+  expenseByCategory: LedgerReportCategorySlice[];
+  monthlyTrend: LedgerReportMonthlyBucket[];
+  insights: LedgerReportInsight[];
+}
+
+// Credit card transactions — mirror of savings, different component types and
+// sign convention (debt up vs savings up).
+export type CreditCardComponentType = 'Charge' | 'Payment' | 'Interest' | 'Fee' | 'Refund';
+
+export interface CreditCardTransaction {
+  lineItemUID: string;
+  date: string;
+  billingMonth: string | null;
+  direction: Direction;
+  componentType: string | null;
+  amount: number;
+  tag: string | null;
+  description: string | null;
+  categoryUID: string;
+  categoryName: string;
+  allocationUID: string;
+}
+
+export interface CreateCreditCardTransactionRequest {
+  date: string;
+  billingMonth: string | null;
+  categoryUID: string;
+  description: string | null;
+  componentType: CreditCardComponentType;
+  amount: number;
+  tag: string | null;
 }

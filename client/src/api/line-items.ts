@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import type {
   CreateLineItemRequest,
   LineItem,
+  LineItemLinkage,
   LineItemQuery,
   UpdateLineItemRequest,
 } from '../types/api';
@@ -34,6 +35,15 @@ export const lineItemsApi = {
 
   update: async (uid: string, request: UpdateLineItemRequest): Promise<LineItem> => {
     const res = await apiClient.put<LineItem>(`/lineitems/${uid}`, request);
+    return res.data;
+  },
+
+  delete: async (uid: string): Promise<void> => {
+    await apiClient.delete(`/lineitems/${uid}`);
+  },
+
+  getLinkages: async (uid: string): Promise<LineItemLinkage[]> => {
+    const res = await apiClient.get<LineItemLinkage[]>(`/lineitems/${uid}/linkages`);
     return res.data;
   },
 };

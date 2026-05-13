@@ -27,6 +27,8 @@ public sealed class LineItemConfiguration : IEntityTypeConfiguration<LineItem>
             .HasForeignKey(li => li.SourceTemplateUID)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.Property(li => li.IsCashMovement).HasDefaultValue(true);
+
         builder.HasIndex(li => li.Date);
         builder.HasIndex(li => li.CategoryUID);
         builder.HasIndex(li => li.SourceTemplateUID);

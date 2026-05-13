@@ -103,3 +103,21 @@ Verbatim capture of feedback and rules during the assets & liabilities design se
 
 ## 2026-05-08 14:00 — Decision
 - `BillingMonth: DateOnly?` (first-of-month convention) added to `LineItemAllocation`, not to `LineItem`, to keep the LineItem schema clean (consistent with the prior rule that A/L-specific fields stay off LineItem). The mortgage payment request carries one optional `BillingMonth` that the manager copies onto every allocation row.
+
+## 2026-05-08 15:30 — Feedback
+- I want to create savings with overview & line items to create a timeline of savings & how much we've had and then what we've withdrew & why to create a story of what's going on with savings
+
+## 2026-05-08 15:35 — Feedback
+- let's start with (A) as a basis. (ii) and let's do (alpha) but let's also create a category column for savings that is different from our standard categories that allows us to do metrics later (it will be select option with create for gruoping instead of a DB table for now)
+
+## 2026-05-08 15:35 — Decision
+- New free-form `Tag: string?` column added to `LineItemAllocation` (not a separate table). Reason: per user feedback — savings-specific grouping for analytics without the overhead of a dedicated lookup table. Frontend uses a react-select Creatable populated from existing distinct `Tag` values, so the user can reuse "Vacation" / "Emergency fund" / "Bonus" or invent new ones inline. Stored alongside `ComponentType` on the same allocation row; the field is generic at the schema layer (other A/L types could reuse it later) but its v1 use is savings transactions.
+
+## 2026-05-08 17:00 — Feedback
+- Next up on our list, we need line items and overviews for credit cards as well, same shebang as savings & mortgages, I'm headed out for the evening so getting it implemented is on you
+
+## 2026-05-08 17:00 — Decision
+- Credit Card Debt detail page mirrors the Savings pattern (which mirrors Mortgage). Same primitives: `LineItem` + `LineItemAllocation` with `LinkedEntityType.CreditCardDebt`. Detail page at `/liabilities/credit-cards/:uid` — Overview / Line Items tabs, summary header (10 stats × 2 rows), per-year cards on the left, balance line + monthly net-change bar on the right, transaction history with edit per row, add-transaction modal.
+- Component types: `Charge`, `Payment`, `Interest`, `Fee`, `Refund`. Sign convention is **inverted from savings** because credit card balance represents debt: Charge / Interest / Fee increase the balance; Payment / Refund decrease it. Color convention also flips — net positive (debt grew) is red, net negative (debt paid down) is green.
+- Tag column reused (already on `LineItemAllocation`); same react-select Creatable UX.
+- `LineItem.Direction` follows the picked category (same logic as savings) — no enforced filter.

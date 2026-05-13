@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  Card,
+  CardBody,
   Form,
   FormGroup,
   Input,
@@ -18,7 +21,7 @@ import {
   RenderDefaultButton,
   RenderPrimaryButton,
 } from '../../UI/functions/render-skeleton-button-functions';
-import type { Savings } from '../../types/api';
+import type { RepairLedgerPolarityReport, Savings } from '../../types/api';
 import { COMPOUNDING_FREQUENCY_LABELS, CompoundingFrequency } from '../../types/enums';
 
 interface FormState {
@@ -51,6 +54,8 @@ export default function SavingsTab() {
   const [editing, setEditing] = useState<Savings | null>(null);
   const [form, setForm] = useState<FormState>(blankForm);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [repairReport, setRepairReport] = useState<RepairLedgerPolarityReport | null>(null);
+  const [repairError, setRepairError] = useState<string | null>(null);
 
   const { data: savings = [], isLoading } = useQuery({
     queryKey: queryKeys.savings.all,
@@ -126,6 +131,139 @@ export default function SavingsTab() {
   };
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  const repairMutation = useMutation({
+    mutationFn: (dryRun: boolean) => savingsApi.repairLedgerPolarity(dryRun),
+    onSuccess: (report) => {
+      setRepairReport(report);
+      setRepairError(null);
+      if (!report.dryRun && report.updated > 0) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.lineItems.all });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      }
+    },
+    onError: (e) => setRepairError(e instanceof Error ? e.message : 'Repair failed'),
+  });
+
+  const startRepair = () => {
+    setRepairReport(null);
+    setRepairError(null);
+    repairMutation.mutate(true);
+  };
+
+  const applyRepair = () => repairMutation.mutate(false);
+
+  const closeRepair = () => {
+    setRepairReport(null);
+    setRepairError(null);
+  };
+
+  const renderRepairModal = () => {
+    const isOpen = repairReport !== null || repairError !== null || repairMutation.isPending;
+    return (
+      <Modal isOpen={isOpen} toggle={closeRepair}>
+        <ModalHeader toggle={closeRepair}>Repair ledger polarity</ModalHeader>
+        <ModalBody>
+          {repairMutation.isPending && <p className="text-muted mb-0">Scanning…</p>}
+          {repairError && <p className="text-danger mb-0">{repairError}</p>}
+          {repairReport && (
+            <div>
+              <p className="mb-2">
+                {repairReport.dryRun
+                  ? `Dry run — no changes written yet.`
+                  : `Repair applied.`}
+              </p>
+              <ul className="mb-2">
+                <li>Scanned: {repairReport.totalScanned}</li>
+                <li>Already correct: {repairReport.alreadyCorrect}</li>
+                <li>
+                  {repairReport.dryRun ? 'Would update' : 'Updated'}: {repairReport.updated}
+                </li>
+                <li>Unknown component type: {repairReport.unknownComponentType}</li>
+              </ul>
+              {Object.keys(repairReport.updatedByComponentType).length > 0 && (
+                <>
+                  <p className="mb-1 fw-semibold">Breakdown by component:</p>
+                  <ul className="mb-0">
+                    {Object.entries(repairReport.updatedByComponentType).map(([k, v]) => (
+                      <li key={k}>
+                        {k}: {v}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <RenderDefaultButton label="Close" onClick={closeRepair} />
+          {repairReport && repairReport.dryRun && repairReport.updated > 0 && (
+            <RenderPrimaryButton
+              label="Apply repair"
+              onClick={applyRepair}
+              disabled={repairMutation.isPending}
+            />
+          )}
+        </ModalFooter>
+      </Modal>
+    );
+  };
+
+  const renderTableContent = () => {
+    if (isLoading)
+      return (
+        <tr>
+          <td colSpan={7} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
+    if (savings.length === 0)
+      return (
+        <tr>
+          <td colSpan={7} className="text-center text-muted py-3">
+            No savings accounts yet.
+          </td>
+        </tr>
+      );
+    return savings.map((s) => (
+      <tr key={s.uid}>
+        <td className="fw-semibold">
+          <Link to={`/assets/savings/${s.uid}`} className="enlil-row-link">
+            {s.name}
+          </Link>
+        </td>
+        <td>{s.institution ?? '—'}</td>
+        <td>{s.subtype ?? '—'}</td>
+        <td className="text-end">{(s.currentRate * 100).toFixed(3)}%</td>
+        <td className="text-end">
+          {s.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td>{s.currentValueAsOfDate}</td>
+        <td>
+          <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(s)} />
+        </td>
+      </tr>
+    ));
+  };
+
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Institution</th>
+          <th>Subtype</th>
+          <th className="text-end">Rate (APY)</th>
+          <th className="text-end">Current Value</th>
+          <th>As Of</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+    </Table>
+  );
 
   const renderModal = () => {
     const isOpen = creating || editing !== null;
@@ -205,44 +343,20 @@ export default function SavingsTab() {
 
   return (
     <div>
-      <div className="d-flex justify-content-end mb-3">
+      <div className="d-flex justify-content-end mb-3 gap-2">
+        <RenderDefaultButton
+          label="Repair ledger polarity"
+          icon="bi-tools"
+          onClick={startRepair}
+          disabled={repairMutation.isPending}
+        />
         <RenderPrimaryButton label="New savings account" onClick={startCreate} />
       </div>
-      {isLoading ? (
-        <p>Loading...</p>
-      ) : savings.length === 0 ? (
-        <p className="text-muted">No savings accounts yet.</p>
-      ) : (
-        <Table hover responsive>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Institution</th>
-              <th>Subtype</th>
-              <th className="text-end">Rate (APY)</th>
-              <th className="text-end">Current Value</th>
-              <th>As Of</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {savings.map((s) => (
-              <tr key={s.uid}>
-                <td className="fw-semibold">{s.name}</td>
-                <td>{s.institution ?? '—'}</td>
-                <td>{s.subtype ?? '—'}</td>
-                <td className="text-end">{(s.currentRate * 100).toFixed(3)}%</td>
-                <td className="text-end">{s.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                <td>{s.currentValueAsOfDate}</td>
-                <td>
-                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(s)} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
       {renderModal()}
+      {renderRepairModal()}
     </div>
   );
 }

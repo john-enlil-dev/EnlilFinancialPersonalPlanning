@@ -1,22 +1,24 @@
 import { useState } from 'react';
 import { Container, Nav, NavItem, NavLink, TabContent, TabPane } from 'reactstrap';
 import { RenderPageHeader } from '../UI/functions/render-page-header';
-import LongTermTab from './asset-tabs/long-term-tab';
+import LongTermContainersSection from './asset-tabs/long-term-containers-section';
+import LongTermItemsSection from './asset-tabs/long-term-items-section';
 import RetirementTab from './asset-tabs/retirement-tab';
 import SavingsTab from './asset-tabs/savings-tab';
 import SimpleAssetsTab from './asset-tabs/simple-assets-tab';
 
-type AssetTab = 'long-term' | 'retirement' | 'simple' | 'savings';
+type AssetTab = 'investments' | 'possessions' | 'retirement' | 'simple' | 'savings';
 
 const TABS: { key: AssetTab; label: string }[] = [
-  { key: 'long-term', label: 'Long-Term' },
+  { key: 'investments', label: 'Investments' },
+  { key: 'possessions', label: 'Possessions' },
   { key: 'retirement', label: 'Retirement' },
   { key: 'simple', label: 'Simple Assets' },
   { key: 'savings', label: 'Savings' },
 ];
 
 export default function AssetsPage() {
-  const [active, setActive] = useState<AssetTab>('long-term');
+  const [active, setActive] = useState<AssetTab>('investments');
 
   return (
     <Container fluid className="py-4">
@@ -35,7 +37,8 @@ export default function AssetsPage() {
         ))}
       </Nav>
       <TabContent activeTab={active}>
-        <TabPane tabId="long-term">{active === 'long-term' && <LongTermTab />}</TabPane>
+        <TabPane tabId="investments">{active === 'investments' && <LongTermContainersSection />}</TabPane>
+        <TabPane tabId="possessions">{active === 'possessions' && <LongTermItemsSection />}</TabPane>
         <TabPane tabId="retirement">{active === 'retirement' && <RetirementTab />}</TabPane>
         <TabPane tabId="simple">{active === 'simple' && <SimpleAssetsTab />}</TabPane>
         <TabPane tabId="savings">{active === 'savings' && <SavingsTab />}</TabPane>

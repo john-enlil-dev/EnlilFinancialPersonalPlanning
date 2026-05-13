@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
+  Card,
+  CardBody,
   Form,
   FormGroup,
   Input,
@@ -161,42 +163,62 @@ export default function LongTermItemsSection() {
     );
   };
 
+  const renderTableContent = () => {
+    if (isLoading)
+      return (
+        <tr>
+          <td colSpan={5} className="text-center py-3">
+            Loading...
+          </td>
+        </tr>
+      );
+    if (items.length === 0)
+      return (
+        <tr>
+          <td colSpan={5} className="text-center text-muted py-3">
+            No items yet.
+          </td>
+        </tr>
+      );
+    return items.map((i) => (
+      <tr key={i.uid}>
+        <td className="fw-semibold">{i.name}</td>
+        <td>{i.subtype ?? '—'}</td>
+        <td className="text-end">
+          {i.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+        </td>
+        <td>{i.currentAsOfDate}</td>
+        <td>
+          <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(i)} />
+        </td>
+      </tr>
+    ));
+  };
+
+  const renderTable = () => (
+    <Table hover responsive>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Subtype</th>
+          <th className="text-end">Current Value</th>
+          <th>As Of</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>{renderTableContent()}</tbody>
+    </Table>
+  );
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-2">
         <h4 className="mb-0">Possessions (houses, art, jewelry, etc.)</h4>
         <RenderPrimaryButton label="New item" onClick={startCreate} />
       </div>
-      {isLoading ? (
-        <p>Loading...</p>
-      ) : items.length === 0 ? (
-        <p className="text-muted">No items yet.</p>
-      ) : (
-        <Table hover responsive>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Subtype</th>
-              <th className="text-end">Current Value</th>
-              <th>As Of</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((i) => (
-              <tr key={i.uid}>
-                <td className="fw-semibold">{i.name}</td>
-                <td>{i.subtype ?? '—'}</td>
-                <td className="text-end">{i.currentValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                <td>{i.currentAsOfDate}</td>
-                <td>
-                  <RenderDefaultButton label="Edit" icon="bi-pencil-square" onClick={() => startEdit(i)} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+      <Card>
+        <CardBody className="p-0">{renderTable()}</CardBody>
+      </Card>
       {renderModal()}
     </div>
   );
