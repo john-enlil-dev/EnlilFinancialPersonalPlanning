@@ -4,11 +4,12 @@ using EnlilFinancialPlanning.Api.Data.Entities.AssetsLiabilities;
 using EnlilFinancialPlanning.Api.Data.Entities.Enums;
 using EnlilFinancialPlanning.Api.Dtos.CreditCardDebts;
 using EnlilFinancialPlanning.Api.Dtos.CreditCardTransactions;
+using EnlilFinancialPlanning.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace EnlilFinancialPlanning.Api.Managers;
 
-public sealed class CreditCardDebtManager(AppDbContext db)
+public sealed class CreditCardDebtManager(AppDbContext db, ICreditCardBalanceService balanceService)
 {
     public async Task<IReadOnlyList<CreditCardDebtResponse>> ListAsync(CancellationToken ct)
         => await db.CreditCardDebts.AsNoTracking()
@@ -44,10 +45,23 @@ public sealed class CreditCardDebtManager(AppDbContext db)
             Date = entity.CurrentAsOfDate,
             Balance = entity.CurrentBalance,
         });
+        // The entered opening balance becomes the first (opening) anchor — the ledger
+        // anchor point the running balance is computed from.
+        db.CreditCardBalanceAnchors.Add(new CreditCardBalanceAnchor
+        {
+            UID = Guid.NewGuid(),
+            CreditCardDebtUID = entity.UID,
+            Date = entity.CurrentAsOfDate,
+            AssertedBalance = entity.CurrentBalance,
+            AdjustmentAmount = 0m,
+            IsOpening = true,
+            Note = "Opening balance",
+        });
         await db.SaveChangesAsync(ct);
         return ToResponse(entity);
     }
 
+    // Metadata only — balance is ledger-driven. Use ReconcileAsync to change the balance.
     public async Task<CreditCardDebtResponse?> UpdateAsync(Guid uid, UpdateCreditCardDebtRequest request, CancellationToken ct)
     {
         var entity = await db.CreditCardDebts.FirstOrDefaultAsync(c => c.UID == uid, ct);
@@ -58,26 +72,125 @@ public sealed class CreditCardDebtManager(AppDbContext db)
         entity.APR = request.APR;
         entity.CreditLimit = request.CreditLimit;
         entity.MinimumPayment = request.MinimumPayment;
-        entity.CurrentBalance = request.CurrentBalance;
-        entity.CurrentAsOfDate = request.CurrentAsOfDate;
 
-        db.CreditCardDebtSnapshots.Add(new CreditCardDebtSnapshot
-        {
-            UID = Guid.NewGuid(),
-            CreditCardDebtUID = entity.UID,
-            Date = entity.CurrentAsOfDate,
-            Balance = entity.CurrentBalance,
-        });
         await db.SaveChangesAsync(ct);
         return ToResponse(entity);
+    }
+
+    // ---- Reconciliation (balance anchors) -------------------------------------
+
+    public async Task<IReadOnlyList<CreditCardBalanceAnchorResponse>?> ListAnchorsAsync(
+        Guid creditCardUid, CancellationToken ct)
+    {
+        var exists = await db.CreditCardDebts.AnyAsync(c => c.UID == creditCardUid, ct);
+        if (!exists) return null;
+
+        return await db.CreditCardBalanceAnchors.AsNoTracking()
+            .Where(a => a.CreditCardDebtUID == creditCardUid)
+            .OrderByDescending(a => a.Date)
+            .ThenByDescending(a => a.IsOpening == false)
+            .Select(a => new CreditCardBalanceAnchorResponse(
+                a.UID, a.Date, a.AssertedBalance, a.AdjustmentAmount, a.IsOpening, a.Note))
+            .ToListAsync(ct);
+    }
+
+    public async Task<CreditCardDebtResponse?> ReconcileAsync(
+        Guid creditCardUid, ReconcileCreditCardDebtRequest request, CancellationToken ct)
+    {
+        var card = await db.CreditCardDebts.FirstOrDefaultAsync(c => c.UID == creditCardUid, ct);
+        if (card is null) return null;
+
+        var category = await db.Categories.FirstOrDefaultAsync(c => c.UID == request.CategoryUID, ct);
+        if (category is null) return null;
+
+        var asOf = request.Date;
+        var computed = await balanceService.ComputeBalanceAsync(creditCardUid, asOf, ct);
+        var drift = request.AssertedBalance - computed; // signed, debt terms
+
+        var anchor = new CreditCardBalanceAnchor
+        {
+            UID = Guid.NewGuid(),
+            CreditCardDebtUID = creditCardUid,
+            Date = asOf,
+            AssertedBalance = request.AssertedBalance,
+            AdjustmentAmount = drift,
+            IsOpening = false,
+            Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
+        };
+        db.CreditCardBalanceAnchors.Add(anchor);
+
+        // Itemize the drift as an Adjustment line item so the ledger stays continuous and
+        // the discrepancy shows up in transaction lists / category reporting. It is dated
+        // on the anchor date, so it never double-counts against the anchor's asserted value.
+        if (drift != 0)
+        {
+            var direction = drift > 0 ? Direction.Expense : Direction.Income;
+            var lineItem = new LineItem
+            {
+                UID = Guid.NewGuid(),
+                Direction = direction,
+                Amount = Math.Abs(drift),
+                Date = asOf,
+                Description = "Reconciliation adjustment",
+                CategoryUID = request.CategoryUID,
+            };
+            db.LineItems.Add(lineItem);
+
+            db.LineItemAllocations.Add(new LineItemAllocation
+            {
+                UID = Guid.NewGuid(),
+                LineItemUID = lineItem.UID,
+                LinkedEntityUID = creditCardUid,
+                LinkedEntityType = LinkedEntityType.CreditCardDebt,
+                ComponentType = CreditCardLedger.AdjustmentComponentType,
+                Amount = Math.Abs(drift),
+                AffectsLinkedBalance = false,
+                BillingMonth = null,
+                Tag = "Reconciliation",
+            });
+
+            anchor.AdjustmentLineItemUID = lineItem.UID;
+        }
+
+        await db.SaveChangesAsync(ct);
+        await balanceService.RecomputeAsync(creditCardUid, ct);
+        return await GetAsync(creditCardUid, ct);
+    }
+
+    public async Task<bool?> DeleteAnchorAsync(Guid creditCardUid, Guid anchorUid, CancellationToken ct)
+    {
+        var anchor = await db.CreditCardBalanceAnchors.FirstOrDefaultAsync(
+            a => a.UID == anchorUid && a.CreditCardDebtUID == creditCardUid, ct);
+        if (anchor is null) return null;
+
+        // Deleting the opening anchor would leave the running balance without a base.
+        if (anchor.IsOpening) return false;
+
+        if (anchor.AdjustmentLineItemUID is Guid lineItemUid)
+        {
+            var allocations = await db.LineItemAllocations
+                .Where(al => al.LineItemUID == lineItemUid)
+                .ToListAsync(ct);
+            db.LineItemAllocations.RemoveRange(allocations);
+
+            var lineItem = await db.LineItems.FirstOrDefaultAsync(li => li.UID == lineItemUid, ct);
+            if (lineItem is not null) db.LineItems.Remove(lineItem);
+        }
+
+        db.CreditCardBalanceAnchors.Remove(anchor);
+        await db.SaveChangesAsync(ct);
+        await balanceService.RecomputeAsync(creditCardUid, ct);
+        return true;
     }
 
     private static CreditCardDebtResponse ToResponse(CreditCardDebt c)
         => new(c.UID, c.Name, c.Institution, c.APR, c.CreditLimit, c.MinimumPayment, c.CurrentBalance, c.CurrentAsOfDate);
 
-    // ---- Transaction history (history-only — AffectsLinkedBalance=false; the
-    // card's CurrentBalance is maintained by direct edits to the card row, not
-    // by these allocations.) ---------------------------------------------------
+    // ---- Transactions (ledger-driven) -----------------------------------------
+    // The card's CurrentBalance is computed from these line items + the latest balance
+    // anchor (see CreditCardBalanceService). AffectsLinkedBalance stays false — derivation
+    // sums by ComponentType and ignores that legacy flag — and every create/update/delete
+    // triggers a recompute of the cached balance.
 
     public async Task<IReadOnlyList<CreditCardTransactionResponse>?> ListTransactionsAsync(
         Guid creditCardUid, CancellationToken ct)
@@ -160,6 +273,7 @@ public sealed class CreditCardDebtManager(AppDbContext db)
         db.LineItemAllocations.Add(allocation);
 
         await db.SaveChangesAsync(ct);
+        await balanceService.RecomputeAsync(creditCardUid, ct);
 
         lineItem.Category = category;
         return ToTransactionResponse(lineItem, allocation);
@@ -199,9 +313,30 @@ public sealed class CreditCardDebtManager(AppDbContext db)
         allocation.Tag = string.IsNullOrWhiteSpace(request.Tag) ? null : request.Tag.Trim();
 
         await db.SaveChangesAsync(ct);
+        await balanceService.RecomputeAsync(creditCardUid, ct);
 
         lineItem.Category = category;
         return ToTransactionResponse(lineItem, allocation);
+    }
+
+    public async Task<bool?> DeleteTransactionAsync(
+        Guid creditCardUid, Guid lineItemUid, CancellationToken ct)
+    {
+        var allocation = await db.LineItemAllocations.FirstOrDefaultAsync(
+            a => a.LineItemUID == lineItemUid
+              && a.LinkedEntityType == LinkedEntityType.CreditCardDebt
+              && a.LinkedEntityUID == creditCardUid,
+            ct);
+        if (allocation is null) return null;
+
+        db.LineItemAllocations.Remove(allocation);
+
+        var lineItem = await db.LineItems.FirstOrDefaultAsync(li => li.UID == lineItemUid, ct);
+        if (lineItem is not null) db.LineItems.Remove(lineItem);
+
+        await db.SaveChangesAsync(ct);
+        await balanceService.RecomputeAsync(creditCardUid, ct);
+        return true;
     }
 
     // LineItem.Direction follows the picked category — same semantic as savings.

@@ -12,4 +12,5 @@ public sealed class CreditCardDebt
     public DateOnly CurrentAsOfDate { get; set; }
 
     public ICollection<CreditCardDebtSnapshot> Snapshots { get; set; } = new List<CreditCardDebtSnapshot>();
+    public ICollection<CreditCardBalanceAnchor> Anchors { get; set; } = new List<CreditCardBalanceAnchor>();
 }

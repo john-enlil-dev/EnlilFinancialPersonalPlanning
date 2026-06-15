@@ -35,6 +35,7 @@ builder.Services.AddScoped<LineItemAllocationManager>();
 
 builder.Services.AddScoped<IMortgageAmortizationService, MortgageAmortizationService>();
 builder.Services.AddScoped<IBalanceAffectService, BalanceAffectService>();
+builder.Services.AddScoped<ICreditCardBalanceService, CreditCardBalanceService>();
 
 builder.Services.AddScoped<EnlilFinancialPlanning.Api.Services.Dashboard.DashboardTilesService>();
 builder.Services.AddScoped<EnlilFinancialPlanning.Api.Services.Dashboard.DashboardTimelineService>();
@@ -83,6 +84,24 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+
+// D8: backfill opening balance anchors for any pre-existing credit cards, then let
+// their post-anchor transactions recompute the cached balance. Idempotent — only acts
+// on cards that have no opening anchor yet. Guarded so a not-yet-migrated DB (the new
+// table is added via PMC Add-Migration/Update-Database) doesn't block startup.
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var ccBalance = scope.ServiceProvider.GetRequiredService<ICreditCardBalanceService>();
+        await ccBalance.BackfillOpeningAnchorsAsync(CancellationToken.None);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex,
+            "Credit card opening-anchor backfill skipped (run the EF migration if the table is missing).");
+    }
+}
 
 RecurringJob.AddOrUpdate<ITemplateSeederService>(
     "extend-template-horizon",

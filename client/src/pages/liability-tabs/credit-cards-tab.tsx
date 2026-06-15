@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Card,
@@ -14,6 +14,7 @@ import {
   ModalHeader,
   Table,
 } from 'reactstrap';
+import { categoriesApi } from '../../api/categories';
 import { creditCardDebtsApi } from '../../api/credit-card-debts';
 import { queryKeys } from '../../api/query-keys';
 import {
@@ -49,6 +50,7 @@ export default function CreditCardsTab() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<CreditCardDebt | null>(null);
   const [form, setForm] = useState<FormState>(blankForm);
+  const [reconcileCategoryUid, setReconcileCategoryUid] = useState<string>('');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { data: cards = [], isLoading } = useQuery({
@@ -56,29 +58,42 @@ export default function CreditCardsTab() {
     queryFn: creditCardDebtsApi.list,
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: queryKeys.categories.list(false),
+    queryFn: () => categoriesApi.list(false),
+  });
+
+  const eligibleCategories = useMemo(
+    () => categories.filter((c) => !c.isArchived),
+    [categories],
+  );
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.creditCardDebts.all });
+  };
+
   const createMutation = useMutation({
     mutationFn: creditCardDebtsApi.create,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.creditCardDebts.all });
-      closeModal();
-    },
-    onError: (e) => setSubmitError(e instanceof Error ? e.message : 'Save failed'),
+    onSuccess: invalidate,
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ uid, req }: { uid: string; req: Parameters<typeof creditCardDebtsApi.update>[1] }) =>
       creditCardDebtsApi.update(uid, req),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.creditCardDebts.all });
-      closeModal();
-    },
-    onError: (e) => setSubmitError(e instanceof Error ? e.message : 'Save failed'),
+    onSuccess: invalidate,
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: ({ uid, req }: { uid: string; req: Parameters<typeof creditCardDebtsApi.reconcile>[1] }) =>
+      creditCardDebtsApi.reconcile(uid, req),
+    onSuccess: invalidate,
   });
 
   const startCreate = () => {
     setForm(blankForm);
     setEditing(null);
     setCreating(true);
+    setReconcileCategoryUid('');
     setSubmitError(null);
   };
 
@@ -94,6 +109,7 @@ export default function CreditCardsTab() {
     });
     setEditing(c);
     setCreating(false);
+    setReconcileCategoryUid('');
     setSubmitError(null);
   };
 
@@ -103,21 +119,111 @@ export default function CreditCardsTab() {
     setSubmitError(null);
   };
 
-  const submit = () => {
-    const payload = {
-      name: form.name,
-      institution: form.institution.trim() || null,
-      apr: Number(form.apr),
-      creditLimit: Number(form.creditLimit),
-      minimumPayment: Number(form.minimumPayment),
-      currentBalance: Number(form.currentBalance),
-      currentAsOfDate: form.currentAsOfDate,
-    };
-    if (creating) createMutation.mutate(payload);
-    else if (editing) updateMutation.mutate({ uid: editing.uid, req: payload });
+  const balanceChanged = editing !== null && Number(form.currentBalance) !== editing.currentBalance;
+
+  const submit = async () => {
+    setSubmitError(null);
+    try {
+      if (creating) {
+        await createMutation.mutateAsync({
+          name: form.name,
+          institution: form.institution.trim() || null,
+          apr: Number(form.apr),
+          creditLimit: Number(form.creditLimit),
+          minimumPayment: Number(form.minimumPayment),
+          currentBalance: Number(form.currentBalance),
+          currentAsOfDate: form.currentAsOfDate,
+        });
+      } else if (editing) {
+        await updateMutation.mutateAsync({
+          uid: editing.uid,
+          req: {
+            name: form.name,
+            institution: form.institution.trim() || null,
+            apr: Number(form.apr),
+            creditLimit: Number(form.creditLimit),
+            minimumPayment: Number(form.minimumPayment),
+          },
+        });
+
+        // D7: changing the balance field is a reconcile (records an anchor + drift adjustment).
+        if (balanceChanged) {
+          const newBalance = Number(form.currentBalance);
+          if (!Number.isFinite(newBalance) || newBalance < 0) {
+            setSubmitError('Enter a balance of zero or more.');
+            return;
+          }
+          if (!reconcileCategoryUid) {
+            setSubmitError('Pick a category for the balance adjustment.');
+            return;
+          }
+          await reconcileMutation.mutateAsync({
+            uid: editing.uid,
+            req: {
+              date: form.currentAsOfDate,
+              assertedBalance: newBalance,
+              categoryUID: reconcileCategoryUid,
+              note: 'Edited from card list',
+            },
+          });
+        }
+      }
+      closeModal();
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Save failed');
+    }
   };
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isSubmitting =
+    createMutation.isPending || updateMutation.isPending || reconcileMutation.isPending;
+
+  const renderReconcileFields = () => {
+    if (!editing) return null;
+    return (
+      <>
+        <FormGroup className="col-md-6">
+          <Label for="cc-balance">Current balance</Label>
+          <Input
+            id="cc-balance"
+            type="number"
+            step="0.01"
+            value={form.currentBalance}
+            onChange={(e) => setForm({ ...form, currentBalance: e.target.value })}
+          />
+        </FormGroup>
+        <FormGroup className="col-md-6">
+          <Label for="cc-date">As-of date</Label>
+          <Input
+            id="cc-date"
+            type="date"
+            value={form.currentAsOfDate}
+            onChange={(e) => setForm({ ...form, currentAsOfDate: e.target.value })}
+          />
+        </FormGroup>
+        {balanceChanged && (
+          <FormGroup className="col-12">
+            <Label for="cc-reconcile-category">
+              Adjustment category{' '}
+              <span className="text-muted">(the balance change is recorded as a reconciliation)</span>
+            </Label>
+            <Input
+              id="cc-reconcile-category"
+              type="select"
+              value={reconcileCategoryUid}
+              onChange={(e) => setReconcileCategoryUid(e.target.value)}
+            >
+              <option value="">Select a category…</option>
+              {eligibleCategories.map((c) => (
+                <option key={c.uid} value={c.uid}>
+                  {c.name}
+                </option>
+              ))}
+            </Input>
+          </FormGroup>
+        )}
+      </>
+    );
+  };
 
   const renderModal = () => {
     const isOpen = creating || editing !== null;
@@ -149,14 +255,20 @@ export default function CreditCardsTab() {
                 <Label for="cc-min">Minimum payment</Label>
                 <Input id="cc-min" type="number" step="0.01" value={form.minimumPayment} onChange={(e) => setForm({ ...form, minimumPayment: e.target.value })} />
               </FormGroup>
-              <FormGroup className="col-md-6">
-                <Label for="cc-balance">Current balance</Label>
-                <Input id="cc-balance" type="number" step="0.01" value={form.currentBalance} onChange={(e) => setForm({ ...form, currentBalance: e.target.value })} />
-              </FormGroup>
-              <FormGroup className="col-md-6">
-                <Label for="cc-date">As-of date</Label>
-                <Input id="cc-date" type="date" value={form.currentAsOfDate} onChange={(e) => setForm({ ...form, currentAsOfDate: e.target.value })} />
-              </FormGroup>
+              {creating ? (
+                <>
+                  <FormGroup className="col-md-6">
+                    <Label for="cc-balance">Opening balance</Label>
+                    <Input id="cc-balance" type="number" step="0.01" value={form.currentBalance} onChange={(e) => setForm({ ...form, currentBalance: e.target.value })} />
+                  </FormGroup>
+                  <FormGroup className="col-md-6">
+                    <Label for="cc-date">As-of date</Label>
+                    <Input id="cc-date" type="date" value={form.currentAsOfDate} onChange={(e) => setForm({ ...form, currentAsOfDate: e.target.value })} />
+                  </FormGroup>
+                </>
+              ) : (
+                renderReconcileFields()
+              )}
             </div>
             {submitError && <p className="text-danger mt-2 mb-0">{submitError}</p>}
           </Form>

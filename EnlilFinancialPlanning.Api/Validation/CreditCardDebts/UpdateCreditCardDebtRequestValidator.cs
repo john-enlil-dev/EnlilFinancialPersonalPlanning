@@ -12,6 +12,5 @@ public sealed class UpdateCreditCardDebtRequestValidator : AbstractValidator<Upd
         RuleFor(x => x.APR).GreaterThanOrEqualTo(0);
         RuleFor(x => x.CreditLimit).GreaterThanOrEqualTo(0);
         RuleFor(x => x.MinimumPayment).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.CurrentBalance).GreaterThanOrEqualTo(0);
     }
 }

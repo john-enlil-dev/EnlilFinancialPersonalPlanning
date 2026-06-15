@@ -42,6 +42,7 @@ export const queryKeys = {
     all: ['credit-card-debts'] as const,
     detail: (uid: string) => ['credit-card-debts', uid] as const,
     transactions: (uid: string) => ['credit-card-debts', uid, 'transactions'] as const,
+    anchors: (uid: string) => ['credit-card-debts', uid, 'anchors'] as const,
   },
   mortgageDebts: {
     all: ['mortgage-debts'] as const,

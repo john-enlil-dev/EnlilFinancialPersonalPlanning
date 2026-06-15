@@ -282,7 +282,30 @@ export interface CreateCreditCardDebtRequest {
   currentAsOfDate: string;
 }
 
-export interface UpdateCreditCardDebtRequest extends CreateCreditCardDebtRequest {}
+// Balance is ledger-driven — update is metadata only. Change the balance via reconcile.
+export interface UpdateCreditCardDebtRequest {
+  name: string;
+  institution: string | null;
+  apr: number;
+  creditLimit: number;
+  minimumPayment: number;
+}
+
+export interface CreditCardBalanceAnchor {
+  uid: string;
+  date: string;
+  assertedBalance: number;
+  adjustmentAmount: number; // signed, debt terms (positive = debt was higher than the ledger thought)
+  isOpening: boolean;
+  note: string | null;
+}
+
+export interface ReconcileCreditCardDebtRequest {
+  date: string;
+  assertedBalance: number;
+  categoryUID: string;
+  note: string | null;
+}
 
 // Mortgage Debts
 export interface MortgageDebt {

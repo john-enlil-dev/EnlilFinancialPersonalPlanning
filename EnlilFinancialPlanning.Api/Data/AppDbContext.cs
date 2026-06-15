@@ -29,6 +29,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<CreditCardDebt> CreditCardDebts => Set<CreditCardDebt>();
     public DbSet<CreditCardDebtSnapshot> CreditCardDebtSnapshots => Set<CreditCardDebtSnapshot>();
+    public DbSet<CreditCardBalanceAnchor> CreditCardBalanceAnchors => Set<CreditCardBalanceAnchor>();
 
     public DbSet<MortgageDebt> MortgageDebts => Set<MortgageDebt>();
     public DbSet<MortgageDebtSnapshot> MortgageDebtSnapshots => Set<MortgageDebtSnapshot>();
